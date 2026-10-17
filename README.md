@@ -1,5 +1,19 @@
 # CABEK.AI — Application globale
 
+## API FastAPI
+
+Les endpoints de lecture des dossiers, résultats enregistrés, images et PDF sont
+documentés dans [docs/api.md](docs/api.md). Le contrat des fichiers produits par
+le moteur est décrit dans [docs/analysis-artifacts.md](docs/analysis-artifacts.md).
+Le lancement des scans et le suivi de progression seront implémentés ensuite.
+
+```bash
+pip install -r requirements-api.txt
+python -m uvicorn api.main:app --reload
+```
+
+Documentation interactive : `http://127.0.0.1:8000/docs`.
+
 L'application est maintenant une seule application Streamlit avec une navigation globale dans la barre latérale.
 
 ## Lancement

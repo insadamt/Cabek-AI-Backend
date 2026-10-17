@@ -4,3 +4,11 @@ __pycache__/
 .env
 .streamlit/secrets.toml
 
+.agents/
+.codex/
+.claude/
+.cursor/
+.aws/
+
+.pytest_cache/
+
