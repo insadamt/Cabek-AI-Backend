@@ -3,6 +3,10 @@ import os
 from pathlib import Path
 
 
+# ============================================================
+# API CONFIGURATION
+# ============================================================
+
 @dataclass(frozen=True)
 class ApiSettings:
     dossiers_dir: Path
@@ -10,6 +14,9 @@ class ApiSettings:
 
     @classmethod
     def from_environment(cls) -> "ApiSettings":
+
+        # Anchor the default to the repo so starting Uvicorn elsewhere still finds the dossiers.
+
         default_root = Path(__file__).resolve().parents[1] / "data" / "dossiers"
         return cls(
             dossiers_dir=Path(os.environ.get("CABEK_DOSSIERS_DIR", default_root)),

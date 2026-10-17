@@ -16,6 +16,10 @@ from api.files import (
 from api.schemas import ScanState, StoredAnalysis, StoredPhoto, Vehicle
 
 
+# ============================================================
+# METADATA AND EXPECTED ARTIFACTS
+# ============================================================
+
 class PhotoMetadata(BaseModel):
     path: str
 
@@ -32,6 +36,10 @@ class DossierRecord:
     metadata: DossierMetadata
     photos: dict[str, StoredPhoto]
 
+
+# ============================================================
+# DOSSIER STORAGE ACCESS
+# ============================================================
 
 class DossierRepository:
     def __init__(self, dossiers_dir: Path):
@@ -67,12 +75,19 @@ class DossierRepository:
             metadata = DossierMetadata.model_validate(
                 read_json_object(metadata_path, "invalid_metadata")
             )
+
+            # Prevent copied or misplaced metadata from being served under another dossier ID.
+
             if metadata.dossier_id != dossier_id:
                 raise ValueError("Dossier identity does not match its folder.")
             photos = self.photo_manifest(directory, metadata)
         except (ValidationError, ValueError) as error:
             raise DossierError(422, "invalid_metadata", "Dossier metadata is invalid.") from error
         return DossierRecord(directory, metadata, photos)
+
+    # ============================================================
+    # EXPECTED PHOTO OUTPUTS
+    # ============================================================
 
     def photo_manifest(
         self, directory: Path, metadata: DossierMetadata
@@ -89,6 +104,9 @@ class DossierRepository:
                 confined_path(directory, original)
             except DossierError as error:
                 raise DossierError(422, "invalid_metadata", "Dossier photo paths are invalid.") from error
+
+            # Derive annotation names from originals instead of trusting arbitrary result paths.
+
             prefix = f"analysis/annotated/{path.stem}"
             photos[path.stem] = StoredPhoto(
                 photo_id=path.stem,
@@ -99,7 +117,14 @@ class DossierRepository:
             )
         return photos
 
+    # ============================================================
+    # SAVED ANALYSIS VALIDATION
+    # ============================================================
+
     def read_analysis(self, dossier: DossierRecord) -> StoredAnalysis | None:
+
+        # The runner publishes this file last; temporary outputs do not establish completion.
+
         path = confined_path(dossier.directory, "analysis/result.json")
         if not path.exists():
             return None
@@ -109,6 +134,9 @@ class DossierRepository:
                 raise ValueError("Result identity mismatch.")
             expected = dossier.photos
             actual = {photo.photo_id: photo for photo in analysis.photos}
+
+            # Comparing manifests catches missing, duplicated, and unrelated photos, not just counts.
+
             if len(actual) != len(analysis.photos) or actual != expected:
                 raise ValueError("Result photo manifest mismatch.")
             for photo in analysis.photos:
@@ -126,19 +154,36 @@ class DossierRepository:
         except (ValidationError, ValueError, DossierError) as error:
             raise DossierError(422, "invalid_result", "Saved analysis or its artifacts are invalid.") from error
 
+    # ============================================================
+    # SCAN STATE FROM SAVED FILES
+    # ============================================================
+
     def read_state(self, dossier: DossierRecord, analysis: StoredAnalysis | None) -> ScanState:
+
+        # Validated artifacts establish completion even if a saved status file is stale.
+
         if analysis is not None:
             return "completed"
         path = confined_path(dossier.directory, "analysis/status.json")
         if not path.exists():
+
+            # Legacy labels such as À valider describe expert review, not durable scan output.
+
             return "not_analyzed"
         state = read_json_object(path, "invalid_status").get("status")
         if not isinstance(state, str) or state not in {"not_analyzed", "queued", "processing", "failed"}:
             raise DossierError(422, "invalid_status", "Saved scan status is invalid.")
         return state
 
+    # ============================================================
+    # ALLOWLISTED IMAGE ACCESS
+    # ============================================================
+
     def media_path(self, dossier: DossierRecord, requested_path: str) -> Path:
         relative_path = normalize_relative_path(requested_path)
+
+        # Never expose the entire dossier: metadata, feedback, and unrelated files stay private.
+
         allowlist = {
             value
             for photo in dossier.photos.values()

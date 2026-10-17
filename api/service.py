@@ -19,6 +19,10 @@ from api.schemas import (
 )
 
 
+# ============================================================
+# LIST QUERY PARAMETERS
+# ============================================================
+
 @dataclass(frozen=True)
 class DossierListQuery:
     search: str = ""
@@ -26,6 +30,10 @@ class DossierListQuery:
     limit: int = 20
     offset: int = 0
 
+
+# ============================================================
+# DOSSIER RESPONSE ORCHESTRATION
+# ============================================================
 
 class DossierService:
     def __init__(self, repository: DossierRepository):
@@ -54,11 +62,17 @@ class DossierService:
                     photo_count=self.available_photo_count(dossier),
                 ))
             except DossierError as error:
+
+                # One damaged folder should not prevent the dashboard from showing healthy dossiers.
+
                 warnings.append(DossierWarning(
                     dossier_id=dossier_id,
                     code=error.code,
                     message="Dossier was skipped because its saved data is unavailable or invalid.",
                 ))
+
+        # Count before the status filter and pagination so dashboard counters remain useful.
+
         counts = DossierCounts(all=len(summaries))
         for item in summaries:
             setattr(counts, item.status, getattr(counts, item.status) + 1)
@@ -75,15 +89,25 @@ class DossierService:
             for photo in dossier.photos.values()
         )
 
+    # ============================================================
+    # SAVED RESULT AND FRONTEND URLS
+    # ============================================================
+
     def read_result(self, dossier_id: str, root_path: str = "") -> DossierResult:
         dossier = self.repository.read_dossier(dossier_id)
         analysis = self.repository.read_analysis(dossier)
         state = self.repository.read_state(dossier, analysis)
         response = DossierResult(dossier_id=dossier_id, status=state)
         if state == "failed":
+
+            # Stored worker errors may contain local paths or credentials; do not return them.
+
             response.error = ErrorDetail(code="scan_failed", message="The scan failed.")
         if analysis is None:
             return response
+
+        # Keep saved paths independent of deployment; include any reverse-proxy URL prefix here.
+
         base_url = f"{root_path.rstrip('/')}/api/dossiers/{quote(dossier_id, safe='')}"
         photos = [
             PhotoUrls(
@@ -101,6 +125,10 @@ class DossierService:
             photos=photos, report_url=f"{base_url}/report",
         )
         return response
+
+    # ============================================================
+    # IMAGE AND REPORT ACCESS
+    # ============================================================
 
     def media_path(self, dossier_id: str, requested_path: str) -> Path:
         dossier = self.repository.read_dossier(dossier_id)

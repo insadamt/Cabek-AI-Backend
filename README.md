@@ -9,10 +9,11 @@ Le lancement des scans et le suivi de progression seront implémentés ensuite.
 
 ```bash
 pip install -r requirements-api.txt
-python -m uvicorn api.main:app --reload
+python -m api --reload
 ```
 
-Documentation interactive : `http://127.0.0.1:8000/docs`.
+Un port local libre est choisi automatiquement. Utilisez l'URL affichée dans le
+terminal, puis ajoutez `/docs` pour ouvrir la documentation interactive.
 
 L'application est maintenant une seule application Streamlit avec une navigation globale dans la barre latérale.
 

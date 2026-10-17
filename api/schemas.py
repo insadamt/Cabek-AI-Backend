@@ -4,9 +4,17 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+# ============================================================
+# SHARED STATUS AND MONEY TYPES
+# ============================================================
+
 ScanState = Literal["not_analyzed", "queued", "processing", "completed", "failed"]
 Money = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
+
+# ============================================================
+# VEHICLE AND FINANCIAL CONTRACTS
+# ============================================================
 
 class Vehicle(BaseModel):
     marque: str = ""
@@ -31,17 +39,23 @@ class FinancialResult(BaseModel):
 
     status: Literal["complete", "incomplete"]
     currency: Literal["MAD"]
-    estimated_total: Money | None
-    known_subtotal: Money
+    estimated_total: Money | None = Field(description="Full estimate in MAD; null when finances are incomplete.")
+    known_subtotal: Money = Field(description="Sum of known financial breakdown amounts in MAD.")
     breakdown: FinancialBreakdown
     warnings: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_totals(self) -> "FinancialResult":
         amounts = list(self.breakdown.model_dump().values())
+
+        # Unknown costs stay null; only known amounts contribute to the partial subtotal.
+
         subtotal = sum(amount for amount in amounts if amount is not None)
         if not isclose(self.known_subtotal, subtotal, rel_tol=0, abs_tol=0.01):
             raise ValueError("Known subtotal must match the financial breakdown.")
+
+        # A numeric partial subtotal must never be presented as a complete estimate.
+
         if self.status == "complete":
             if None in amounts or self.estimated_total is None:
                 raise ValueError("Complete finances require every amount.")
@@ -51,6 +65,10 @@ class FinancialResult(BaseModel):
             raise ValueError("Incomplete finances require a null total and warnings.")
         return self
 
+
+# ============================================================
+# RUNNER OUTPUT STORED ON DISK
+# ============================================================
 
 class StoredPhoto(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -74,6 +92,10 @@ class StoredAnalysis(BaseModel):
     photos: list[StoredPhoto] = Field(min_length=1)
 
 
+# ============================================================
+# FRONTEND RESULT CONTRACT
+# ============================================================
+
 class PhotoUrls(BaseModel):
     photo_id: str
     original_url: str
@@ -86,11 +108,15 @@ class AnalysisResult(BaseModel):
     schema_version: Literal[1]
     vehicle: Vehicle
     financial: FinancialResult
-    parts: list[dict[str, Any]]
-    detections: list[dict[str, Any]]
+    parts: list[dict[str, Any]] = Field(description="Saved part objects; engine-specific fields still to be agreed.")
+    detections: list[dict[str, Any]] = Field(description="Saved detection objects; engine-specific fields still to be agreed.")
     photos: list[PhotoUrls]
-    report_url: str
+    report_url: str = Field(description="URL for downloading the saved PDF.")
 
+
+# ============================================================
+# ERROR AND DOSSIER RESPONSES
+# ============================================================
 
 class ErrorDetail(BaseModel):
     code: str
@@ -104,17 +130,24 @@ class ErrorResponse(BaseModel):
 class DossierResult(BaseModel):
     dossier_id: str
     status: ScanState
-    progress: None = None
-    error: ErrorDetail | None = None
-    result: AnalysisResult | None = None
 
+    # Keep the response shape ready for scan integration without inventing progress today.
+
+    progress: None = Field(default=None, description="Always null until scan progress tracking is implemented.")
+    error: ErrorDetail | None = None
+    result: AnalysisResult | None = Field(default=None, description="Saved analysis; null without valid final output.")
+
+
+# ============================================================
+# DASHBOARD SUMMARIES AND COUNTS
+# ============================================================
 
 class DossierSummary(BaseModel):
     dossier_id: str
     vehicle: Vehicle
     created_at: str | None = None
     status: ScanState
-    photo_count: int
+    photo_count: int = Field(description="Number of existing declared original photos.")
 
 
 class DossierCounts(BaseModel):
@@ -134,8 +167,8 @@ class DossierWarning(BaseModel):
 
 class DossierList(BaseModel):
     items: list[DossierSummary]
-    total: int
-    counts: DossierCounts
+    total: int = Field(description="Matches after search and status filtering, before pagination.")
+    counts: DossierCounts = Field(description="Counts after search, before status filtering and pagination.")
     limit: int
     offset: int
-    warnings: list[DossierWarning]
+    warnings: list[DossierWarning] = Field(description="Folders skipped because their saved data is unavailable or invalid.")

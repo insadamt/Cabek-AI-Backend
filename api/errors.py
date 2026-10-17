@@ -4,6 +4,10 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 
+# ============================================================
+# ERROR CONTRACT
+# ============================================================
+
 class DossierError(Exception):
     def __init__(self, status_code: int, code: str, message: str):
         super().__init__(message)
@@ -11,6 +15,10 @@ class DossierError(Exception):
         self.code = code
         self.message = message
 
+
+# ============================================================
+# SAFE HTTP ERROR RESPONSES
+# ============================================================
 
 def error_response(status_code: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(
@@ -26,6 +34,9 @@ def handle_dossier_error(request: Request, error: DossierError) -> JSONResponse:
 def handle_validation_error(
     request: Request, error: RequestValidationError
 ) -> JSONResponse:
+
+    # Validation details can contain submitted values; expose a stable message instead.
+
     return error_response(422, "invalid_request", "Invalid request parameters.")
 
 
