@@ -71,7 +71,7 @@ def list_dossiers(
     description=(
         "Requires an existing dossier ID. Returns saved vehicle, financial, part, detection, "
         "and photo data with image/PDF URLs when final artifacts are valid. "
-        "Without final output, result is null. Progress is null in this phase. "
+        "Without final output, result is null. Managed scans return real artifact counts in progress. "
         "A completed scan may have incomplete finances. Does not start a scan."
     ),
     response_description="Saved analysis state and nullable result.",

@@ -17,6 +17,8 @@ Money = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 # ============================================================
 
 class Vehicle(BaseModel):
+    marque_id: Annotated[int, Field(strict=True, gt=0)] | None = None
+    model_id: Annotated[int, Field(strict=True, gt=0)] | None = None
     marque: str = ""
     modele: str = ""
     matricule: str = ""
@@ -108,8 +110,8 @@ class AnalysisResult(BaseModel):
     schema_version: Literal[1]
     vehicle: Vehicle
     financial: FinancialResult
-    parts: list[dict[str, Any]] = Field(description="Saved part objects; engine-specific fields still to be agreed.")
-    detections: list[dict[str, Any]] = Field(description="Saved detection objects; engine-specific fields still to be agreed.")
+    parts: list[dict[str, Any]] = Field(description="Part IDs, names, actions, finances, detection IDs, and source images.")
+    detections: list[dict[str, Any]] = Field(description="Saved engine detections, severity, confidence, feedback, and costs.")
     photos: list[PhotoUrls]
     report_url: str = Field(description="URL for downloading the saved PDF.")
 
@@ -127,13 +129,29 @@ class ErrorResponse(BaseModel):
     error: ErrorDetail
 
 
+# ============================================================
+# OBSERVED SCAN OUTPUT READINESS
+# ============================================================
+
+class ScanProgress(BaseModel):
+    stage: Literal["queued", "preparing", "analyzing_photos", "finalizing", "completed", "failed"]
+    annotations_ready: int = Field(ge=0)
+    annotations_expected: int = Field(ge=0)
+    photos_completed: int = Field(ge=0)
+    photos_total: int = Field(ge=0)
+    elapsed_seconds: float = Field(ge=0)
+    eta_seconds: float | None = Field(default=None, description="Unknown until a reliable estimate is available.")
+    report_ready: bool
+    result_ready: bool
+
+
 class DossierResult(BaseModel):
     dossier_id: str
     status: ScanState
 
-    # Keep the response shape ready for scan integration without inventing progress today.
+    # Unscanned dossiers have no progress; managed scans expose observed file counts.
 
-    progress: None = Field(default=None, description="Always null until scan progress tracking is implemented.")
+    progress: ScanProgress | None = None
     error: ErrorDetail | None = None
     result: AnalysisResult | None = Field(default=None, description="Saved analysis; null without valid final output.")
 

@@ -1,7 +1,7 @@
 # Dossier API
 
-Read existing dossiers, saved results, images, and PDFs. All endpoints use `GET`
-and have no request body. Scan execution and progress tracking come later.
+Read existing dossiers, start real analyses, and retrieve saved results, images,
+and PDFs. Only vehicle selection requires a JSON request body.
 
 ## Run locally
 
@@ -14,17 +14,84 @@ pip install -r requirements-api.txt
 python -m api --reload
 ```
 
+To enable real scans, also install `pip install -r requirements-scan.txt`.
+The API can serve saved results without model dependencies; scan requests return
+`503` when dependencies or model files are missing.
+
 The OS selects a free local port. Use the URL printed by Uvicorn, then append
 `/docs` for interactive documentation. Each launch may use a different port.
 Omit `--reload` to disable automatic restarts.
 No authentication is required in this local integration phase.
 
+The API automatically loads the repository-root `.env` on startup. Existing
+environment variables take precedence, and scan workers inherit these values.
+For local pricing, set `AUTOESTIMATE_TOKEN` and `AUTOESTIMATE_BASE_URL` there;
+see `.env.example`. The private `.env` is ignored by Git. Restart the API after
+editing it. The URL in the example is the original application's local service;
+change it if your AutoEstimate service runs elsewhere.
+Pricing also requires real `marque_id` and `model_id` values in dossier metadata;
+vehicle names alone do not trigger a pricing lookup. The token stays on the backend and
+is not needed in Postman or frontend requests.
+
 | Environment variable | Purpose | Default |
 | --- | --- | --- |
 | `CABEK_DOSSIERS_DIR` | Absolute path to the dossier folders | Repository `data/dossiers` |
 | `CABEK_CORS_ORIGINS` | Comma-separated frontend origins | No cross-origin access |
+| `CABEK_MODELS_DIR` | Directory containing the three existing `.pt` models | Repository `models` |
+| `CABEK_SCAN_TIMEOUT_SECONDS` | Maximum execution time per scan | `1800` |
+| `CABEK_SCAN_MAX_PENDING` | Maximum accepted scans, including the running scan | `8` |
+| `AUTOESTIMATE_BASE_URL` | Pricing API base URL, including `/api/v1` | Unset |
+| `AUTOESTIMATE_TOKEN` | Pricing bearer token | Unset |
 
 Example frontend origin: `http://localhost:5173`.
+Missing pricing configuration produces an incomplete estimate, not an invented
+price. Use one API server process: it runs one model worker at a time and queues
+other accepted dossiers to limit model memory use.
+
+## Vehicle selection
+
+`GET /api/vehicles/marques` returns `[{"id": 12, "libelle": "Dacia"}]`.
+`GET /api/vehicles/models?marque_id=12` returns
+`[{"id": 34, "marque_id": 12, "libelle": "Sandero"}]`.
+These IDs illustrate the format; use actual returned IDs. Both endpoints use
+the backend token and return `503 autoestimate_unavailable` if reference data
+cannot be loaded or is invalid. A model query requires a positive brand ID;
+an empty list means no models were returned.
+
+`PUT /api/dossiers/{dossier_id}/vehicle` selects a vehicle for an existing dossier.
+Send JSON with positive integer IDs only:
+
+```json
+{"marque_id": 12, "model_id": 34}
+```
+
+The backend verifies the brand exists and the model belongs to it, then atomically
+saves the IDs and canonical names, preserving photos and other metadata. Returns
+`200` with `{"marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero"}`.
+Names cannot be supplied in this request. Invalid IDs or relationships return
+`422`; unknown dossier `404`; active or completed scans `409`; unavailable
+AutoEstimate or storage `503`. Failed validation leaves metadata unchanged.
+
+Saved vehicle metadata looks like:
+
+```json
+{
+  "dossier_id": "DOS-001",
+  "marque_id": 12,
+  "model_id": 34,
+  "marque": "Dacia",
+  "modele": "Sandero",
+  "annee": "2020",
+  "matricule": "EXAMPLE",
+  "photos": [{"path": "photos/avant_01.jpg"}]
+}
+```
+
+IDs must be supplied together. Existing dossiers with names only remain supported
+without automatic migration. When IDs are present, scan admission revalidates
+them and refreshes saved names before capturing inputs; AutoEstimate must be
+reachable. Dashboard/result reads use saved names without network calls. New
+analysis vehicle objects include both IDs; legacy results may return null IDs.
 
 ## GET `/api/dossiers`
 
@@ -73,6 +140,59 @@ existing declared originals. Invalid folders are skipped and reported in
 
 **Errors:** `422` invalid query; `503` storage unavailable.
 
+## POST `/api/dossiers/{dossier_id}/scan`
+
+Start a real analysis using the existing models. No body or model settings are
+accepted from the frontend.
+
+**Needs:** an existing dossier with at least one photo; all declared originals
+must be valid JPEG/PNG files whose content matches the extension. The three model
+files and scan dependencies must be available.
+
+**Returns `202`:** an accepted job, without waiting for inference:
+
+```json
+{
+  "dossier_id": "DOS-001",
+  "status": "queued",
+  "progress": {
+    "stage": "queued",
+    "annotations_ready": 0,
+    "annotations_expected": 15,
+    "photos_completed": 0,
+    "photos_total": 5,
+    "elapsed_seconds": 0,
+    "eta_seconds": null,
+    "report_ready": false,
+    "result_ready": false
+  },
+  "error": null,
+  "result": null
+}
+```
+
+Poll `GET /api/dossiers/{dossier_id}/result` every 1–2 seconds until `completed`
+or `failed`. Counts come from valid generated files, not a timer. Each photo
+requires parts, damage, and critical-zone annotations: five photos mean fifteen
+files. Stages are `queued`, `preparing`, `analyzing_photos`, `finalizing`, then
+`completed` or `failed`. ETA stays `null` while no reliable estimate is available.
+
+Failed scans can retry with the same POST. All outputs use the same `analysis/`
+directory. Under the dossier lock, retry cleanup removes incomplete generated
+files before analysis starts again from scratch. It preserves original inputs,
+manual files, active locks, and completed results. There are no per-run folders.
+
+Completed dossiers reject rescans permanently. Closing the browser does not stop
+processing. API shutdown stops its worker. After restart, valid final output is
+preserved as completed; incomplete interrupted work becomes failed and can retry.
+Cleanup waits if an old worker is still running. Computation is not resumed
+mid-photo.
+
+**Errors:** `404` unknown dossier; `409 already_analyzed` or `scan_in_progress`;
+`422` invalid inputs; `503 worker_unavailable` for missing dependencies/models,
+a full queue, or a stopped worker. Stored failure codes include `scan_failed`,
+`scan_timeout`, `scan_interrupted`, and `scan_inputs_changed`.
+
 ## GET `/api/dossiers/{dossier_id}/result`
 
 Use for the saved expertise screen. This endpoint does not start a scan.
@@ -100,8 +220,8 @@ For a completed analysis, `status` is `completed` and `result` contains:
 | `schema_version` | `1` |
 | `vehicle` | Same vehicle fields as the listing; missing year/date stays `null` |
 | `financial` | Completeness, currency, totals, breakdown, and warnings; example below |
-| `parts` | Array of part objects; engine-specific fields still to be agreed |
-| `detections` | Array of detection objects; engine-specific fields still to be agreed |
+| `parts` | Part ID, name, action (`repair`/`replace`), financial details, detection IDs, source images |
+| `detections` | Existing engine detections, including severity, confidence, feedback, and costs |
 | `photos` | Array of photo IDs and URLs; example below |
 | `report_url` | `/api/dossiers/DOS-001/report` |
 
@@ -141,10 +261,11 @@ Each entry in `photos` has this shape:
 
 Use the returned URLs directly. Critical-zone images need not appear in the UI.
 
-`progress` is always `null` in this phase. Without final output, existing saved
-states can be `not_analyzed`, `queued`, `processing`, or `failed`. A failed state
-returns `error: {"code": "scan_failed", "message": "The scan failed."}` and
-`result: null`. Legacy labels such as `À valider` do not establish completion.
+`progress` is `null` before a managed scan exists. During a scan, it contains
+observed output counts as shown above. The last snapshot remains available on
+failure or completion. Legacy external status files have no managed progress.
+A failed state returns a safe error code/message and `result: null`.
+Legacy labels such as `À valider` do not establish completion.
 
 **Errors:** `404` unknown dossier; `422` invalid ID, saved data, or required
 artifacts; `503` storage unavailable.
@@ -197,10 +318,11 @@ raw exception details are not exposed.
 
 ```bash
 pip install -r requirements-api-dev.txt
-python -m pytest tests/api -q
+python -m pytest tests -q
 ```
 
-Tests use temporary fixtures, not repository data.
+Tests use temporary fixtures, not repository data. Model/report tests require
+the optional scan dependencies.
 
 Manual checklist:
 
@@ -209,6 +331,10 @@ Manual checklist:
 - List, search, filter, and paginate dossiers in `/docs`.
 - Confirm counts remain useful when filtering by status.
 - Read an unscanned dossier and open an existing original image.
+- POST a scan, poll real file counts, and confirm the final JSON/PDF open.
+- Confirm concurrent scans and successful rescans return `409`.
+- Retry a failed scan; verify incomplete outputs are cleared and progress starts from zero.
+- Confirm photos, metadata, feedback, manual files, and completed results are preserved.
 - Once real outputs exist, inspect the result and follow its image/PDF URLs.
 - Restart the API and reopen a saved result.
 - Check unknown IDs, invalid parameters, and disallowed file paths.
