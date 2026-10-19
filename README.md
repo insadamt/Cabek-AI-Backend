@@ -5,10 +5,12 @@
 Les endpoints de lecture des dossiers, résultats enregistrés, images et PDF sont
 documentés dans [docs/api.md](docs/api.md). Le contrat des fichiers produits par
 le moteur est décrit dans [docs/analysis-artifacts.md](docs/analysis-artifacts.md).
-Le lancement des scans et le suivi de progression seront implémentés ensuite.
+Le scan utilise les modèles existants dans un processus séparé, avec suivi des
+fichiers générés et sauvegarde du résultat et du rapport PDF.
 
 ```bash
 pip install -r requirements-api.txt
+pip install -r requirements-scan.txt
 python -m api --reload
 ```
 

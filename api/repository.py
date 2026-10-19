@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from api.errors import DossierError
 from api.files import (
@@ -13,7 +13,7 @@ from api.files import (
     validate_image,
     validate_pdf,
 )
-from api.schemas import ScanState, StoredAnalysis, StoredPhoto, Vehicle
+from api.schemas import ScanProgress, ScanState, StoredAnalysis, StoredPhoto, Vehicle
 
 
 # ============================================================
@@ -28,6 +28,12 @@ class DossierMetadata(Vehicle):
     dossier_id: str
     created_at: str | None = None
     photos: list[PhotoMetadata] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_vehicle_ids(self):
+        if (self.marque_id is None) != (self.model_id is None):
+            raise ValueError("Vehicle IDs must be provided together.")
+        return self
 
 
 @dataclass(frozen=True)
@@ -123,7 +129,13 @@ class DossierRepository:
 
     def read_analysis(self, dossier: DossierRecord) -> StoredAnalysis | None:
 
-        # The runner publishes this file last; temporary outputs do not establish completion.
+        # A managed worker can write JSON just before failing; wait for its validated verdict.
+
+        status_path = confined_path(dossier.directory, "analysis/status.json")
+        if status_path.is_file():
+            status = read_json_object(status_path, "invalid_status")
+            if status.get("managed_by") == "cabek_scan_v1" and status.get("status") != "completed":
+                return None
 
         path = confined_path(dossier.directory, "analysis/result.json")
         if not path.exists():
@@ -174,6 +186,29 @@ class DossierRepository:
         if not isinstance(state, str) or state not in {"not_analyzed", "queued", "processing", "failed"}:
             raise DossierError(422, "invalid_status", "Saved scan status is invalid.")
         return state
+
+    # ============================================================
+    # SAVED PROGRESS WITHOUT WORKER ERROR DETAILS
+    # ============================================================
+
+    def read_progress(self, dossier: DossierRecord) -> ScanProgress | None:
+        path = confined_path(dossier.directory, "analysis/status.json")
+        if not path.is_file():
+            return None
+        record = read_json_object(path, "invalid_status")
+        if record.get("managed_by") != "cabek_scan_v1":
+            return None
+        try:
+            return ScanProgress.model_validate(record["progress"])
+        except (ValidationError, KeyError) as error:
+            raise DossierError(422, "invalid_status", "Saved progress is invalid.") from error
+
+    def read_failure_code(self, dossier: DossierRecord) -> str:
+        path = confined_path(dossier.directory, "analysis/status.json")
+        record = read_json_object(path, "invalid_status") if path.is_file() else {}
+        code = record.get("error_code")
+        allowed = ("scan_failed", "scan_timeout", "scan_interrupted", "scan_inputs_changed")
+        return code if code in allowed else "scan_failed"
 
     # ============================================================
     # ALLOWLISTED IMAGE ACCESS

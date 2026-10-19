@@ -170,12 +170,14 @@ def test_missing_and_empty_storage_are_distinct(storage):
     assert not missing.exists()
 
 
-def test_unknown_dossier_and_scan_endpoint_are_unavailable(client):
+def test_unknown_dossier_and_scan_route_documentation(client):
     assert client.get("/api/dossiers/DOS-UNKNOWN/result").status_code == 404
     assert client.post("/api/dossiers/DOS-001/scan").status_code == 404
     paths = client.get("/openapi.json").json()["paths"]
-    assert len(paths) == 4
-    assert all(set(methods) == {"get"} for methods in paths.values())
+    assert len(paths) == 8
+    assert "post" in paths["/api/dossiers/{dossier_id}/scan"]
+    assert "put" in paths["/api/dossiers/{dossier_id}/vehicle"]
+    assert all("get" in methods for path, methods in paths.items() if not path.endswith(("/scan", "/vehicle")))
 
 
 def test_cors_is_explicit_and_exposes_pdf_filename(storage):

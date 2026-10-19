@@ -97,14 +97,21 @@ class DossierService:
         dossier = self.repository.read_dossier(dossier_id)
         analysis = self.repository.read_analysis(dossier)
         state = self.repository.read_state(dossier, analysis)
-        response = DossierResult(dossier_id=dossier_id, status=state)
+        response = DossierResult(
+            dossier_id=dossier_id, status=state, progress=self.repository.read_progress(dossier),
+        )
         if state == "failed":
 
             # Stored worker errors may contain local paths or credentials; do not return them.
 
-            response.error = ErrorDetail(code="scan_failed", message="The scan failed.")
+            response.error = ErrorDetail(code=self.repository.read_failure_code(dossier), message="The scan failed.")
         if analysis is None:
             return response
+        if response.progress is not None:
+            response.progress.stage = "completed"
+            response.progress.annotations_ready = response.progress.annotations_expected
+            response.progress.photos_completed = response.progress.photos_total
+            response.progress.result_ready = response.progress.report_ready = True
 
         # Keep saved paths independent of deployment; include any reverse-proxy URL prefix here.
 
