@@ -13,6 +13,7 @@ from api.schemas import (
     DossierSummary,
     DossierWarning,
     ErrorDetail,
+    OriginalPhoto,
     PhotoUrls,
     ScanState,
     Vehicle,
@@ -92,6 +93,21 @@ class DossierService:
     # ============================================================
     # SAVED RESULT AND FRONTEND URLS
     # ============================================================
+
+    def list_original_photos(self, dossier_id: str, root_path: str = "") -> list[OriginalPhoto]:
+        dossier = self.repository.read_dossier(dossier_id)
+        base_url = f"{root_path.rstrip('/')}/api/dossiers/{quote(dossier_id, safe='')}"
+
+        # Originals remain available before analysis; never load or require generated artifacts.
+
+        return [
+            OriginalPhoto(
+                photo_id=photo.photo_id,
+                original_url=f"{base_url}/media/{quote(photo.original_path, safe='/')}",
+            )
+            for photo in dossier.photos.values()
+            if confined_path(dossier.directory, photo.original_path).is_file()
+        ]
 
     def read_result(self, dossier_id: str, root_path: str = "") -> DossierResult:
         dossier = self.repository.read_dossier(dossier_id)

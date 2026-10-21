@@ -140,6 +140,15 @@ existing declared originals. Invalid folders are skipped and reported in
 
 **Errors:** `422` invalid query; `503` storage unavailable.
 
+## GET `/api/dossiers/{dossier_id}/photos`
+
+Lists existing declared original photos for folder previews, including dossiers
+that have never been analysed. Returns `[{"photo_id": "avant_01", "original_url":
+"/api/dossiers/DOS-001/media/photos/avant_01.jpg"}]`. URLs include the deployment
+prefix. Missing originals are omitted. No annotations, analysis validation, file
+writes, or scan requests occur. Unknown dossiers return `404`; invalid metadata
+returns `422`; unavailable storage returns `503`.
+
 ## POST `/api/dossiers/{dossier_id}/scan`
 
 Start a real analysis using the existing models. No body or model settings are

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import FileResponse
 
 from api.files import IMAGE_MEDIA_TYPES
-from api.schemas import DossierList, DossierResult, ErrorResponse, ScanState
+from api.schemas import DossierList, DossierResult, ErrorResponse, OriginalPhoto, ScanState
 from api.service import DossierListQuery, DossierService
 
 
@@ -60,6 +60,21 @@ def list_dossiers(
     offset: Annotated[int, Query(ge=0, description="Matching items to skip before this page.")] = 0,
 ) -> DossierList:
     return service.list_dossiers(DossierListQuery(search, status, limit, offset))
+
+
+# ============================================================
+# ORIGINAL PHOTO LISTING
+# ============================================================
+
+@router.get(
+    "/{dossier_id}/photos", response_model=list[OriginalPhoto],
+    summary="List original dossier photos",
+    description="Returns declared, existing original photo URLs before or after analysis. Read-only; no annotations or scan request.",
+)
+def list_original_photos(
+    dossier_id: DossierId, request: Request, service: ServiceDependency,
+) -> list[OriginalPhoto]:
+    return service.list_original_photos(dossier_id, request.scope.get("root_path", ""))
 
 
 # ============================================================

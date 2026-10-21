@@ -98,6 +98,11 @@ class StoredAnalysis(BaseModel):
 # FRONTEND RESULT CONTRACT
 # ============================================================
 
+class OriginalPhoto(BaseModel):
+    photo_id: str
+    original_url: str
+
+
 class PhotoUrls(BaseModel):
     photo_id: str
     original_url: str
