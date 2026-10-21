@@ -140,15 +140,6 @@ existing declared originals. Invalid folders are skipped and reported in
 
 **Errors:** `422` invalid query; `503` storage unavailable.
 
-## GET `/api/dossiers/{dossier_id}/photos`
-
-Lists existing declared original photos for folder previews, including dossiers
-that have never been analysed. Returns `[{"photo_id": "avant_01", "original_url":
-"/api/dossiers/DOS-001/media/photos/avant_01.jpg"}]`. URLs include the deployment
-prefix. Missing originals are omitted. No annotations, analysis validation, file
-writes, or scan requests occur. Unknown dossiers return `404`; invalid metadata
-returns `422`; unavailable storage returns `503`.
-
 ## POST `/api/dossiers/{dossier_id}/scan`
 
 Start a real analysis using the existing models. No body or model settings are
@@ -164,6 +155,7 @@ files and scan dependencies must be available.
 {
   "dossier_id": "DOS-001",
   "status": "queued",
+  "photos": [],
   "progress": {
     "stage": "queued",
     "annotations_ready": 0,
@@ -204,7 +196,11 @@ a full queue, or a stopped worker. Stored failure codes include `scan_failed`,
 
 ## GET `/api/dossiers/{dossier_id}/result`
 
-Use for the saved expertise screen. This endpoint does not start a scan.
+Use for dossier details and the saved expertise screen. This endpoint does not start a scan.
+The top-level `photos` array contains existing declared originals in every scan
+state, including before analysis. Missing originals are omitted; URLs include
+the deployment prefix. The separate `/photos` endpoint has been removed; use
+this response instead. The paginated dossier list continues to return `photo_count`.
 
 **Needs:** an existing dossier ID, for example `DOS-001`. A completed result
 requires valid `analysis/result.json`, all declared originals and annotations,
@@ -216,6 +212,10 @@ and `analysis/report.pdf`.
 {
   "dossier_id": "DOS-001",
   "status": "not_analyzed",
+  "photos": [{
+    "photo_id": "avant_01",
+    "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg"
+  }],
   "progress": null,
   "error": null,
   "result": null
@@ -256,7 +256,7 @@ An incomplete financial result can belong to a **completed scan**:
 `known_subtotal` adds known breakdown amounts. A complete estimate has every
 amount and a numeric `estimated_total`; unknown costs remain `null`.
 
-Each entry in `photos` has this shape:
+Each entry in `result.photos` has this shape:
 
 ```json
 {
@@ -339,7 +339,9 @@ Manual checklist:
 - Open `/docs` using each printed URL.
 - List, search, filter, and paginate dossiers in `/docs`.
 - Confirm counts remain useful when filtering by status.
-- Read an unscanned dossier and open an existing original image.
+- Read an unscanned dossier and open an image from the top-level `photos` array.
+- Confirm completed details include originals in `photos` and annotations in `result.photos`.
+- Confirm the removed `/api/dossiers/{dossier_id}/photos` endpoint returns `404`.
 - POST a scan, poll real file counts, and confirm the final JSON/PDF open.
 - Confirm concurrent scans and successful rescans return `409`.
 - Retry a failed scan; verify incomplete outputs are cleared and progress starts from zero.

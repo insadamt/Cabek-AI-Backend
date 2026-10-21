@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import FileResponse
 
 from api.files import IMAGE_MEDIA_TYPES
-from api.schemas import DossierList, DossierResult, ErrorResponse, OriginalPhoto, ScanState
+from api.schemas import DossierList, DossierResult, ErrorResponse, ScanState
 from api.service import DossierListQuery, DossierService
 
 
@@ -63,21 +63,6 @@ def list_dossiers(
 
 
 # ============================================================
-# ORIGINAL PHOTO LISTING
-# ============================================================
-
-@router.get(
-    "/{dossier_id}/photos", response_model=list[OriginalPhoto],
-    summary="List original dossier photos",
-    description="Returns declared, existing original photo URLs before or after analysis. Read-only; no annotations or scan request.",
-)
-def list_original_photos(
-    dossier_id: DossierId, request: Request, service: ServiceDependency,
-) -> list[OriginalPhoto]:
-    return service.list_original_photos(dossier_id, request.scope.get("root_path", ""))
-
-
-# ============================================================
 # SAVED ANALYSIS
 # ============================================================
 
@@ -86,7 +71,7 @@ def list_original_photos(
     description=(
         "Requires an existing dossier ID. Returns saved vehicle, financial, part, detection, "
         "and photo data with image/PDF URLs when final artifacts are valid. "
-        "Without final output, result is null. Managed scans return real artifact counts in progress. "
+        "Original photos are always included; without final output, result is null. Managed scans return real artifact counts in progress. "
         "A completed scan may have incomplete finances. Does not start a scan."
     ),
     response_description="Saved analysis state and nullable result.",

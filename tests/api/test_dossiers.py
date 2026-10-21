@@ -34,6 +34,8 @@ def test_existing_legacy_folder_is_not_analyzed(client, create_dossier):
     assert data == {
         "dossier_id": "DOS-001", "status": "not_analyzed", "progress": None,
         "error": None, "result": None,
+        "photos": [{"photo_id": "avant_01", "original_url":
+                    "/api/dossiers/DOS-001/media/photos/avant_01.jpg"}],
     }
     assert client.get("/api/dossiers").json()["items"][0]["photo_count"] == 1
     assert client.get("/api/dossiers/DOS-001/media/photos/avant_01.jpg").status_code == 200
@@ -174,8 +176,9 @@ def test_unknown_dossier_and_scan_route_documentation(client):
     assert client.get("/api/dossiers/DOS-UNKNOWN/result").status_code == 404
     assert client.post("/api/dossiers/DOS-001/scan").status_code == 404
     paths = client.get("/openapi.json").json()["paths"]
-    assert len(paths) == 9
-    assert "get" in paths["/api/dossiers/{dossier_id}/photos"]
+    assert len(paths) == 8
+    assert "/api/dossiers/{dossier_id}/photos" not in paths
+    assert client.get("/api/dossiers/DOS-001/photos").status_code == 404
     assert "post" in paths["/api/dossiers/{dossier_id}/scan"]
     assert "put" in paths["/api/dossiers/{dossier_id}/vehicle"]
     assert all("get" in methods for path, methods in paths.items() if not path.endswith(("/scan", "/vehicle")))

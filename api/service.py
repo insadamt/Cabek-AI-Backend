@@ -94,9 +94,7 @@ class DossierService:
     # SAVED RESULT AND FRONTEND URLS
     # ============================================================
 
-    def list_original_photos(self, dossier_id: str, root_path: str = "") -> list[OriginalPhoto]:
-        dossier = self.repository.read_dossier(dossier_id)
-        base_url = f"{root_path.rstrip('/')}/api/dossiers/{quote(dossier_id, safe='')}"
+    def original_photo_urls(self, dossier: DossierRecord, base_url: str) -> list[OriginalPhoto]:
 
         # Originals remain available before analysis; never load or require generated artifacts.
 
@@ -111,10 +109,12 @@ class DossierService:
 
     def read_result(self, dossier_id: str, root_path: str = "") -> DossierResult:
         dossier = self.repository.read_dossier(dossier_id)
+        base_url = f"{root_path.rstrip('/')}/api/dossiers/{quote(dossier_id, safe='')}"
         analysis = self.repository.read_analysis(dossier)
         state = self.repository.read_state(dossier, analysis)
         response = DossierResult(
             dossier_id=dossier_id, status=state, progress=self.repository.read_progress(dossier),
+            photos=self.original_photo_urls(dossier, base_url),
         )
         if state == "failed":
 
@@ -129,9 +129,6 @@ class DossierService:
             response.progress.photos_completed = response.progress.photos_total
             response.progress.result_ready = response.progress.report_ready = True
 
-        # Keep saved paths independent of deployment; include any reverse-proxy URL prefix here.
-
-        base_url = f"{root_path.rstrip('/')}/api/dossiers/{quote(dossier_id, safe='')}"
         photos = [
             PhotoUrls(
                 photo_id=photo.photo_id,

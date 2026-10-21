@@ -153,6 +153,9 @@ class ScanProgress(BaseModel):
 class DossierResult(BaseModel):
     dossier_id: str
     status: ScanState
+    photos: list[OriginalPhoto] = Field(
+        default_factory=list, description="Existing original photos, available before analysis."
+    )
 
     # Unscanned dossiers have no progress; managed scans expose observed file counts.
 
