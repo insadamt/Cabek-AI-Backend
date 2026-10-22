@@ -15,6 +15,7 @@ def test_originals_are_available_without_analysis(client, create_dossier, legacy
     assert response.json()["photos"] == [{
         "photo_id": "avant_01",
         "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg",
+        "preview_url": "/api/dossiers/DOS-001/preview/photos/avant_01.jpg.webp",
     }]
     assert client.get(response.json()["photos"][0]["original_url"]).status_code == 200
     assert client.get("/api/dossiers/DOS-001/result").json()["result"] is None
@@ -27,7 +28,7 @@ def test_originals_are_included_with_completed_analysis(client, complete_dossier
     response = client.get("/api/dossiers/DOS-001/result")
     assert response.status_code == 200
     assert response.json()["result"]["photos"][0]["parts_url"]
-    assert set(response.json()["photos"][0]) == {"photo_id", "original_url"}
+    assert set(response.json()["photos"][0]) == {"photo_id", "original_url", "preview_url"}
     assert client.get(response.json()["photos"][0]["original_url"]).status_code == 200
 
 

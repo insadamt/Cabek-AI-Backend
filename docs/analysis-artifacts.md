@@ -125,3 +125,11 @@ validated metadata, photo manifest, feedback, model directory, and the cleaned
 `analysis/` directory. It writes artifacts there and raises on failure. The API
 handles admission, locks, retry cleanup, process lifetime, input-change checks,
 and completion validation. No progress callback is required.
+
+## WebP display previews
+
+The API derives WebP display previews on demand from allowlisted original or
+annotation files. These are held in a bounded memory cache, never saved alongside
+runner artifacts, and do not affect output validation or scan completion.
+Saved paths and version 1 annotations remain JPEG/PNG as specified above.
+See [api.md](api.md) for preview URLs, image dimensions, quality, and HTTP caching.

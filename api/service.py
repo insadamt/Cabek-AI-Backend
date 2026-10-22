@@ -102,6 +102,7 @@ class DossierService:
             OriginalPhoto(
                 photo_id=photo.photo_id,
                 original_url=f"{base_url}/media/{quote(photo.original_path, safe='/')}",
+                preview_url=f"{base_url}/preview/{quote(photo.original_path, safe='/')}.webp",
             )
             for photo in dossier.photos.values()
             if confined_path(dossier.directory, photo.original_path).is_file()
@@ -134,6 +135,11 @@ class DossierService:
                 photo_id=photo.photo_id,
                 **{
                     field.replace("_path", "_url"): f"{base_url}/media/{quote(path, safe='/')}"
+                    for field, path in photo.model_dump().items()
+                    if field != "photo_id"
+                },
+                **{
+                    field.replace("_path", "_preview_url"): f"{base_url}/preview/{quote(path, safe='/')}.webp"
                     for field, path in photo.model_dump().items()
                     if field != "photo_id"
                 },

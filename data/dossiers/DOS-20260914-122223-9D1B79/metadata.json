@@ -1,7 +1,7 @@
 {
   "dossier_id": "DOS-20260914-122223-9D1B79",
-  "marque": "BYD",
-  "modele": "Seal U",
+  "marque": "10",
+  "modele": "5",
   "matricule": "1234-A-6",
   "expert": "cabek",
   "created_at": "2026-09-14T12:22:23",
@@ -39,6 +39,4 @@
     }
   ],
   "updated_at": "2026-10-21T12:13:20.589302+00:00",
-  "marque_id": 5,
-  "model_id": 49
 }

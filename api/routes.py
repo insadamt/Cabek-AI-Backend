@@ -1,9 +1,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from api.files import IMAGE_MEDIA_TYPES
+from api.errors import DossierError
+from api.previews import generate_webp_preview
 from api.schemas import DossierList, DossierResult, ErrorResponse, ScanState
 from api.service import DossierListQuery, DossierService
 
@@ -106,6 +108,40 @@ def read_media(
         headers={"X-Content-Type-Options": "nosniff"},
         content_disposition_type="inline",
     )
+
+
+# ============================================================
+# COMPRESSED DISPLAY PREVIEWS
+# ============================================================
+
+@router.get(
+    "/{dossier_id}/preview/{path:path}", response_class=Response,
+    summary="Read a compressed WebP preview",
+    description=(
+        "Use returned preview URLs. Append .webp to an allowlisted source path. "
+        "Preserves aspect ratio, limits the longest edge to 1600 pixels, and uses quality 82. "
+        "Original media and saved analysis files are preserved."
+    ),
+    responses={200: {"content": {"image/webp": {}}}, 304: {"description": "Preview unchanged"}},
+)
+def read_preview(
+    dossier_id: DossierId, path: str, request: Request, service: ServiceDependency,
+) -> Response:
+    if not path.endswith(".webp"):
+        raise DossierError(404, "artifact_not_found", "Artifact not found.")
+
+    # Validate the source on every request, including cache hits and conditional requests.
+
+    source = service.media_path(dossier_id, path[:-5])
+    content, etag = generate_webp_preview(source)
+    headers = {
+        "ETag": etag, "Cache-Control": "private, no-cache",
+        "X-Content-Type-Options": "nosniff",
+    }
+    requested_etags = [value.strip().removeprefix("W/") for value in request.headers.get("if-none-match", "").split(",")]
+    if etag in requested_etags or "*" in requested_etags:
+        return Response(status_code=304, headers=headers)
+    return Response(content, media_type="image/webp", headers=headers)
 
 
 # ============================================================

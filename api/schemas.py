@@ -101,6 +101,7 @@ class StoredAnalysis(BaseModel):
 class OriginalPhoto(BaseModel):
     photo_id: str
     original_url: str
+    preview_url: str
 
 
 class PhotoUrls(BaseModel):
@@ -109,6 +110,10 @@ class PhotoUrls(BaseModel):
     parts_url: str
     damages_url: str
     critical_url: str
+    original_preview_url: str
+    parts_preview_url: str
+    damages_preview_url: str
+    critical_preview_url: str
 
 
 class AnalysisResult(BaseModel):

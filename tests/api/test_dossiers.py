@@ -35,7 +35,8 @@ def test_existing_legacy_folder_is_not_analyzed(client, create_dossier):
         "dossier_id": "DOS-001", "status": "not_analyzed", "progress": None,
         "error": None, "result": None,
         "photos": [{"photo_id": "avant_01", "original_url":
-                    "/api/dossiers/DOS-001/media/photos/avant_01.jpg"}],
+                    "/api/dossiers/DOS-001/media/photos/avant_01.jpg",
+                    "preview_url": "/api/dossiers/DOS-001/preview/photos/avant_01.jpg.webp"}],
     }
     assert client.get("/api/dossiers").json()["items"][0]["photo_count"] == 1
     assert client.get("/api/dossiers/DOS-001/media/photos/avant_01.jpg").status_code == 200
@@ -52,7 +53,10 @@ def test_saved_result_urls_media_report_and_restart(client, complete_dossier, st
         if key != "photo_id":
             media = client.get(url)
             assert media.status_code == 200
-            assert media.headers["content-type"] in {"image/jpeg", "image/png"}
+            if key.endswith("_preview_url"):
+                assert media.headers["content-type"] == "image/webp"
+            else:
+                assert media.headers["content-type"] in {"image/jpeg", "image/png"}
             assert media.headers["x-content-type-options"] == "nosniff"
     report = client.get(result["result"]["report_url"])
     assert report.status_code == 200
@@ -176,7 +180,8 @@ def test_unknown_dossier_and_scan_route_documentation(client):
     assert client.get("/api/dossiers/DOS-UNKNOWN/result").status_code == 404
     assert client.post("/api/dossiers/DOS-001/scan").status_code == 404
     paths = client.get("/openapi.json").json()["paths"]
-    assert len(paths) == 8
+    assert len(paths) == 9
+    assert "image/webp" in paths["/api/dossiers/{dossier_id}/preview/{path}"]["get"]["responses"]["200"]["content"]
     assert "/api/dossiers/{dossier_id}/photos" not in paths
     assert client.get("/api/dossiers/DOS-001/photos").status_code == 404
     assert "post" in paths["/api/dossiers/{dossier_id}/scan"]

@@ -214,7 +214,8 @@ and `analysis/report.pdf`.
   "status": "not_analyzed",
   "photos": [{
     "photo_id": "avant_01",
-    "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg"
+    "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg",
+    "preview_url": "/api/dossiers/DOS-001/preview/photos/avant_01.jpg.webp"
   }],
   "progress": null,
   "error": null,
@@ -264,11 +265,18 @@ Each entry in `result.photos` has this shape:
   "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg",
   "parts_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_pieces.png",
   "damages_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_dommages.png",
-  "critical_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_critical.png"
+  "critical_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_critical.png",
+  "original_preview_url": "/api/dossiers/DOS-001/preview/photos/avant_01.jpg.webp",
+  "parts_preview_url": "/api/dossiers/DOS-001/preview/analysis/annotated/avant_01_pieces.png.webp",
+  "damages_preview_url": "/api/dossiers/DOS-001/preview/analysis/annotated/avant_01_dommages.png.webp",
+  "critical_preview_url": "/api/dossiers/DOS-001/preview/analysis/annotated/avant_01_critical.png.webp"
 }
 ```
 
-Use the returned URLs directly. Critical-zone images need not appear in the UI.
+Use the returned URLs directly. For display, use top-level `photos[].preview_url`
+and `result.photos[].*_preview_url`. Existing `*_url` media fields still serve
+the full saved files for downloads or detailed inspection. Critical-zone images
+need not appear in the UI. Load annotations only when their view is opened.
 
 `progress` is `null` before a managed scan exists. During a scan, it contains
 observed output counts as shown above. The last snapshot remains available on
@@ -297,6 +305,32 @@ Windows-style paths in existing metadata are supported internally.
 
 **Errors:** `404` unknown dossier or missing/disallowed image; `422` invalid ID,
 metadata, or unreadable image; `503` storage unavailable.
+
+## GET `/api/dossiers/{dossier_id}/preview/{path}.webp`
+
+Use the returned preview URLs for the viewer and comparison slider. The source
+extension is preserved before `.webp`, for example `photos/avant_01.jpg.webp`
+or `analysis/annotated/avant_01_pieces.png.webp`.
+
+**Returns `200`:** `image/webp` bytes, encoded at quality 82, with the longest
+edge limited to 1600 pixels. Aspect ratio is preserved and small images are
+not enlarged. Pixel orientation is preserved to align originals and annotations.
+Original files, saved PNG annotations, inference inputs, and PDFs are unchanged.
+WebP is a display format; scan inputs still require JPEG/PNG.
+
+Previews are generated on demand and kept in a bounded in-memory cache of
+16 entries per API process. No preview files are written to dossier storage.
+Source identity, size, and modification/change times invalidate cache entries;
+restart or eviction requires encoding again. Pillow must have WebP support.
+
+Responses include `ETag` and `Cache-Control: private, no-cache`, allowing browser
+storage with revalidation. Send `If-None-Match` to receive `304` with no body
+when unchanged. The original media allowlist and image validation run even on
+cache hits and conditional requests. Cached images cannot bypass deleted,
+invalid, or disallowed sources.
+
+**Errors:** `404` missing/disallowed source or missing `.webp` suffix; `422`
+invalid ID, metadata, or unreadable image; `503` storage unavailable.
 
 ## GET `/api/dossiers/{dossier_id}/report`
 
@@ -349,3 +383,15 @@ Manual checklist:
 - Once real outputs exist, inspect the result and follow its image/PDF URLs.
 - Restart the API and reopen a saved result.
 - Check unknown IDs, invalid parameters, and disallowed file paths.
+
+WebP preview manual checklist:
+
+- Open an unscanned dossier's `photos[].preview_url`; confirm `image/webp`.
+- Open all four completed `*_preview_url` values, including behind a proxy prefix.
+- Compare fine scratches, labels, and damage boundaries against the full saved image.
+- Confirm original and annotation previews align in the comparison slider.
+- Check the longest edge is at most 1600 pixels and smaller images are not enlarged.
+- Compare transferred bytes and loading time in browser DevTools.
+- Revalidate with `If-None-Match`; expect `304`, then change the source and expect `200` with a new ETag.
+- Confirm original downloads, scan inputs, and saved analysis files are unchanged.
+- Confirm missing, corrupt, undeclared, and escaping source paths remain blocked.
