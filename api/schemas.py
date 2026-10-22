@@ -157,6 +157,7 @@ class ScanProgress(BaseModel):
 
 class DossierResult(BaseModel):
     dossier_id: str
+    vehicle: Vehicle = Field(description="Current saved metadata vehicle, available in every scan state.")
     status: ScanState
     photos: list[OriginalPhoto] = Field(
         default_factory=list, description="Existing original photos, available before analysis."

@@ -92,6 +92,9 @@ without automatic migration. When IDs are present, scan admission revalidates
 them and refreshes saved names before capturing inputs; AutoEstimate must be
 reachable. Dashboard/result reads use saved names without network calls. New
 analysis vehicle objects include both IDs; legacy results may return null IDs.
+Legacy null `marque` and `modele` metadata values are read as empty names without
+rewriting the file. Numeric IDs belong in `marque_id` and `model_id`, not name
+fields; the model ID key is `model_id` (not `modele_id`).
 
 ## GET `/api/dossiers`
 
@@ -155,6 +158,10 @@ files and scan dependencies must be available.
 {
   "dossier_id": "DOS-001",
   "status": "queued",
+  "vehicle": {
+    "marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero",
+    "matricule": "EXAMPLE", "annee": "2020", "date_sinistre": null
+  },
   "photos": [],
   "progress": {
     "stage": "queued",
@@ -197,6 +204,12 @@ a full queue, or a stopped worker. Stored failure codes include `scan_failed`,
 ## GET `/api/dossiers/{dossier_id}/result`
 
 Use for dossier details and the saved expertise screen. This endpoint does not start a scan.
+The top-level `vehicle` contains saved metadata IDs and names in every scan state,
+including before analysis. Reads do not call AutoEstimate or update metadata.
+ID-only metadata returns its IDs with empty names; use the vehicle-selection PUT
+to validate those IDs and save canonical names before analysis. Legacy name-only
+metadata returns null IDs. For completed analyses, `result.vehicle` remains the
+saved analysis snapshot while top-level `vehicle` reflects current metadata.
 The top-level `photos` array contains existing declared originals in every scan
 state, including before analysis. Missing originals are omitted; URLs include
 the deployment prefix. The separate `/photos` endpoint has been removed; use
@@ -212,6 +225,10 @@ and `analysis/report.pdf`.
 {
   "dossier_id": "DOS-001",
   "status": "not_analyzed",
+  "vehicle": {
+    "marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero",
+    "matricule": "EXAMPLE", "annee": "2020", "date_sinistre": null
+  },
   "photos": [{
     "photo_id": "avant_01",
     "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg",
@@ -374,6 +391,9 @@ Manual checklist:
 - List, search, filter, and paginate dossiers in `/docs`.
 - Confirm counts remain useful when filtering by status.
 - Read an unscanned dossier and open an image from the top-level `photos` array.
+- Confirm top-level `vehicle` exposes saved IDs and names before analysis and in queued, processing, failed, and completed states.
+- With ID-only metadata, confirm IDs remain visible and names are empty; save through `PUT /vehicle` and confirm canonical names appear.
+- Confirm detail reads work without AutoEstimate and leave metadata unchanged.
 - Confirm completed details include originals in `photos` and annotations in `result.photos`.
 - Confirm the removed `/api/dossiers/{dossier_id}/photos` endpoint returns `404`.
 - POST a scan, poll real file counts, and confirm the final JSON/PDF open.

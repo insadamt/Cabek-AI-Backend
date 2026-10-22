@@ -1,7 +1,9 @@
 {
   "dossier_id": "2",
-  "marque": "10",
-  "modele": "75",
+  "marque_id": 10,
+  "model_id": 75,
+  "marque": "",
+  "modele": "",
   "matricule": "2345-B-3",
   "expert": "CABEK",
   "created_at": "2026-09-15T11:19:35",

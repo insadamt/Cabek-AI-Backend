@@ -115,6 +115,7 @@ class DossierService:
         state = self.repository.read_state(dossier, analysis)
         response = DossierResult(
             dossier_id=dossier_id, status=state, progress=self.repository.read_progress(dossier),
+            vehicle=Vehicle.model_validate(dossier.metadata.model_dump()),
             photos=self.original_photo_urls(dossier, base_url),
         )
         if state == "failed":

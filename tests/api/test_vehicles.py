@@ -7,11 +7,53 @@ import requests
 
 from api.vehicle_catalog import VehicleCatalog
 from api.errors import DossierError
+from conftest import write_json
 
 
 # ============================================================
 # REFERENCE DATA AND CANONICAL METADATA
 # ============================================================
+
+@pytest.mark.parametrize("state", ["not_analyzed", "queued", "processing", "failed", "completed"])
+@pytest.mark.parametrize("names_present", [False, True])
+def test_detail_exposes_metadata_vehicle_without_reference_lookup(
+    client, create_dossier, complete_dossier, autoestimate, state, names_present,
+):
+    directory = complete_dossier()[0] if state == "completed" else create_dossier()
+    path = directory / "metadata.json"
+    metadata = json.loads(path.read_text())
+    metadata.update(marque_id=12, model_id=34)
+    if names_present:
+        metadata.update(marque="Dacia", modele="Sandero")
+    else:
+        metadata.pop("marque")
+        metadata.pop("modele")
+    write_json(path, metadata)
+    if state in {"queued", "processing", "failed"}:
+        write_json(directory / "analysis/status.json", {"status": state})
+    before = path.read_bytes()
+
+    response = client.get("/api/dossiers/DOS-001/result")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == state
+    assert data["vehicle"] == {
+        "marque_id": 12, "model_id": 34,
+        "marque": "Dacia" if names_present else "",
+        "modele": "Sandero" if names_present else "",
+        "matricule": "TEST-123", "annee": None, "date_sinistre": None,
+    }
+    assert data["vehicle"] == client.get("/api/dossiers").json()["items"][0]["vehicle"]
+
+    # Completed analysis keeps the vehicle snapshot used for its calculation.
+
+    if state == "completed":
+        assert data["result"]["vehicle"]["modele"] == "Logan"
+    else:
+        assert data["result"] is None
+    assert path.read_bytes() == before
+    autoestimate.assert_not_called()
 
 @pytest.fixture
 def autoestimate(monkeypatch):
@@ -127,7 +169,11 @@ def test_scan_snapshots_canonical_names_from_manually_supplied_ids(storage, crea
     metadata.update(marque_id=12, model_id=34)
     path.write_text(json.dumps(metadata))
     with TestClient(create_app(ApiSettings(storage), FixtureBackend())) as client:
-        assert client.post("/api/dossiers/DOS-001/scan").status_code == 202
+        response = client.post("/api/dossiers/DOS-001/scan")
+        assert response.status_code == 202
+        assert response.json()["vehicle"]["marque_id"] == 12
+        assert response.json()["vehicle"]["model_id"] == 34
+        assert response.json()["vehicle"]["modele"] == "Sandero"
         snapshot = json.loads((directory / "analysis/.request.json").read_text())
         assert snapshot["metadata"]["marque"] == "Dacia"
         assert snapshot["metadata"]["modele"] == "Sandero"

@@ -107,6 +107,7 @@ class ScanManager:
                     raise DossierError(503, "worker_unavailable", "The scan worker is unavailable.") from error
             return DossierResult(
                 dossier_id=dossier_id, status="queued",
+                vehicle=dossier.metadata,
                 progress=ScanProgress.model_validate(record["progress"]),
             )
         except Exception as error:
@@ -234,5 +235,7 @@ class ScanManager:
                             self.save_recovered_status(dossier, record, "completed")
             except Timeout:
                 continue
-            except (DossierError, OSError, ValueError):
+            except DossierError as error:
+                logger.warning("Could not recover saved scan state for %s: %s", dossier_id, error.code)
+            except (OSError, ValueError):
                 logger.warning("Could not recover saved scan state for %s", dossier_id)

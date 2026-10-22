@@ -73,7 +73,8 @@ def list_dossiers(
     description=(
         "Requires an existing dossier ID. Returns saved vehicle, financial, part, detection, "
         "and photo data with image/PDF URLs when final artifacts are valid. "
-        "Original photos are always included; without final output, result is null. Managed scans return real artifact counts in progress. "
+        "Metadata vehicle and original photos are always included; without final output, result is null. "
+        "Vehicle reads use saved IDs and names without reference lookups. Managed scans return real artifact counts in progress. "
         "A completed scan may have incomplete finances. Does not start a scan."
     ),
     response_description="Saved analysis state and nullable result.",

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from api.errors import DossierError
 from api.files import (
@@ -28,6 +28,14 @@ class DossierMetadata(Vehicle):
     dossier_id: str
     created_at: str | None = None
     photos: list[PhotoMetadata] = Field(default_factory=list)
+
+    @field_validator("marque", "modele", mode="before")
+    @classmethod
+    def normalize_missing_vehicle_names(cls, value):
+
+        # Legacy metadata uses null for unknown names; IDs remain the source of vehicle identity.
+
+        return "" if value is None else value
 
     @model_validator(mode="after")
     def validate_vehicle_ids(self):
