@@ -2,19 +2,21 @@
   "dossier_id": "2",
   "marque_id": 10,
   "model_id": 75,
-  "marque": "",
-  "modele": "",
+  "marque": "Dacia",
+  "modele": "Sandero",
   "matricule": "2345-B-3",
   "expert": "CABEK",
   "created_at": "2026-09-15T11:19:35",
   "status": "À valider",
   "photos": [
     {
-      "path": "photos\\48236-A-14_AVANT_2026-10-01 10_30_10.jpeg"
+      "path": "photos/48236-A-14_AVANT_2026-10-01 10_30_10.jpeg"
     },
     {
-      "path": "photos\\N_78512_6abe362cde8582.87630184.jpeg"
+      "path": "photos/N_78512_6abe362cde8582.87630184.jpeg"
     }
   ],
-  "updated_at": "2026-09-21T13:50:45"
+  "updated_at": "2026-10-23T09:33:33.099757+00:00",
+  "annee": null,
+  "date_sinistre": null
 }

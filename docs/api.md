@@ -72,7 +72,8 @@ Names cannot be supplied in this request. Invalid IDs or relationships return
 `422`; unknown dossier `404`; active or completed scans `409`; unavailable
 AutoEstimate or storage `503`. Failed validation leaves metadata unchanged.
 
-Saved vehicle metadata looks like:
+Saved vehicle metadata looks like the example below. The full file contract and
+legacy compatibility rules are documented in [metadata.md](metadata.md).
 
 ```json
 {
@@ -82,6 +83,7 @@ Saved vehicle metadata looks like:
   "marque": "Dacia",
   "modele": "Sandero",
   "annee": "2020",
+  "date_sinistre": null,
   "matricule": "EXAMPLE",
   "photos": [{"path": "photos/avant_01.jpg"}]
 }
@@ -118,8 +120,8 @@ Example: `/api/dossiers?search=dacia&status=not_analyzed&limit=20&offset=0`.
   "items": [{
     "dossier_id": "DOS-001",
     "vehicle": {
-      "marque": "Dacia", "modele": "Logan", "matricule": "EXAMPLE",
-      "annee": "2015", "date_sinistre": null
+      "marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero",
+      "matricule": "EXAMPLE", "annee": "2020", "date_sinistre": null
     },
     "created_at": "2026-10-17T09:00:00",
     "status": "not_analyzed",
@@ -245,7 +247,7 @@ For a completed analysis, `status` is `completed` and `result` contains:
 | Field | Returned value |
 | --- | --- |
 | `schema_version` | `1` |
-| `vehicle` | Same vehicle fields as the listing; missing year/date stays `null` |
+| `vehicle` | Saved analysis snapshot with the same vehicle fields as the listing, including both IDs; legacy IDs and missing year/date stay `null` |
 | `financial` | Completeness, currency, totals, breakdown, and warnings; example below |
 | `parts` | Part ID, name, action (`repair`/`replace`), financial details, detection IDs, source images |
 | `detections` | Existing engine detections, including severity, confidence, feedback, and costs |

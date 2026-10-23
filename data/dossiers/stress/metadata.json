@@ -3,7 +3,6 @@
   "marque_id": 10,
   "model_id": 75,
   "matricule": "STRESS-TEST",
-
   "expert": "",
   "created_at": "2026-10-22T13:30:20+00:00",
   "status": "Brouillon",
@@ -350,5 +349,10 @@
       "source_dossier_id": "DOS-20261003-105257-A6B805",
       "source_path": "photos/gauche_01.jpeg"
     }
-  ]
+  ],
+  "marque": "Dacia",
+  "modele": "Sandero",
+  "annee": null,
+  "date_sinistre": null,
+  "updated_at": "2026-10-23T09:33:33.109775+00:00"
 }

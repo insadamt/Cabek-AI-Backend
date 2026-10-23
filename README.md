@@ -5,6 +5,10 @@
 Les endpoints de lecture des dossiers, résultats enregistrés, images et PDF sont
 documentés dans [docs/api.md](docs/api.md). Le contrat des fichiers produits par
 le moteur est décrit dans [docs/analysis-artifacts.md](docs/analysis-artifacts.md).
+Le format de `metadata.json` est décrit dans [docs/metadata.md](docs/metadata.md) :
+les identifiants `marque_id` et `model_id` sont des entiers positifs fournis
+ensemble, et `marque` et `modele` contiennent les noms enregistrés. Les anciens
+dossiers contenant uniquement les noms restent compatibles.
 Le scan utilise les modèles existants dans un processus séparé, avec suivi des
 fichiers générés et sauvegarde du résultat et du rapport PDF.
 

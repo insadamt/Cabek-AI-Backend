@@ -18,7 +18,8 @@ data/dossiers/<dossier_id>/
     result.json                 # publish last
 ```
 
-Metadata must contain a matching `dossier_id` and a `photos` array of objects
+The input file follows [metadata.md](metadata.md). Metadata must contain a
+matching `dossier_id`; scans require a nonempty `photos` array of objects
 containing `path`. Originals must be directly under `photos/`. Photo IDs are
 the original filename without its extension, unique within the dossier.
 The existing repository's Windows-style photo paths are supported.
@@ -29,6 +30,9 @@ validates their relationship against AutoEstimate and saves canonical `marque`
 and `modele` labels. Scan admission repeats validation for ID-based dossiers
 before taking the input snapshot. Saved labels keep reads available offline;
 legacy name-only dossiers remain supported. Do not guess IDs from vehicle names.
+ID-only metadata is readable with empty labels; legacy null names are read as
+empty strings without rewriting the file. Use `model_id`, not `modele_id`.
+Numeric IDs must never be stored in the name fields.
 
 The runner writes into a backend-supplied output directory and publishes each
 artifact by writing a temporary sibling file, closing it, then renaming it.
@@ -61,10 +65,12 @@ ignored by Git.
   "schema_version": 1,
   "dossier_id": "DOS-001",
   "vehicle": {
+    "marque_id": 12,
+    "model_id": 34,
     "marque": "Dacia",
-    "modele": "Logan",
+    "modele": "Sandero",
     "matricule": "EXAMPLE",
-    "annee": "2015",
+    "annee": "2020",
     "date_sinistre": null
   },
   "financial": {
@@ -100,6 +106,11 @@ annotations are required even with zero detections. Critical-zone images are
 served but need not be displayed by the frontend. Missing or unreadable required
 artifacts make final output invalid. Zero input photos cannot form a completed
 analysis.
+
+`vehicle` captures the metadata vehicle at analysis time, including both IDs.
+Legacy analyses may omit IDs; API responses expose those IDs as `null`.
+The snapshot is distinct from the current top-level metadata vehicle returned
+by the dossier detail endpoint.
 
 Financial amounts must be finite and nonnegative. `known_subtotal` equals the sum
 of known breakdown amounts (within one cent). `complete` requires every breakdown
