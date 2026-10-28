@@ -1,13 +1,14 @@
 {
   "dossier_id": "stress",
+  "marque": "Dacia",
   "marque_id": 10,
+  "modele": "Sandero",
   "model_id": 75,
-  "matricule": "STRESS-TEST",
+  "annee": "2026",
+  "matricule": "Stress",
   "expert": "",
-  "created_at": "2026-10-22T13:30:20+00:00",
-  "status": "Brouillon",
-  "benchmark_only": true,
-  "description": "All original photos from existing dossiers, including repeated content. Mixed vehicles: estimates are not meaningful for a real claim.",
+  "created_at": "2026-10-03T10:52:57",
+  "status": "À valider",
   "photos": [
     {
       "filename": "2__48236-A-14_AVANT_2026-10-01 10_30_10.jpeg",
@@ -350,9 +351,5 @@
       "source_path": "photos/gauche_01.jpeg"
     }
   ],
-  "marque": "Dacia",
-  "modele": "Sandero",
-  "annee": null,
-  "date_sinistre": null,
-  "updated_at": "2026-10-23T09:33:33.109775+00:00"
+  "updated_at": "2026-10-28T11:51:53.788613+00:00"
 }
