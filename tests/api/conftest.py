@@ -1,3 +1,10 @@
+"""Isolated API storage, saved artifacts, and local workflow test fixtures.
+
+Depends on TestClient and Pillow; catalog fixtures replace upstream I/O and never
+read or modify repository dossiers or use real AutoEstimate credentials.
+"""
+
+import io
 import json
 from pathlib import Path
 
@@ -77,3 +84,51 @@ def complete_dossier(create_dossier):
         write_json(directory / "analysis/result.json", result)
         return directory, result
     return complete
+
+
+# ============================================================
+# LOCAL WORKFLOW FIXTURES
+# ============================================================
+
+@pytest.fixture
+def workflow_catalog(monkeypatch):
+    from unittest.mock import Mock
+
+    def reference(path, params=None):
+        if path == "marques":
+            return [{"id": 12, "libelle": "Dacia"}]
+        return [{"id": 34, "marque_id": 12, "libelle": "Sandero"}]
+
+    transport = Mock(side_effect=reference)
+    monkeypatch.setattr("api.vehicle_catalog.VehicleCatalog.read_reference", transport)
+    return transport
+
+
+@pytest.fixture
+def new_dossier(client, workflow_catalog):
+    def create(category="chiffrage_rapide", **changes):
+        response = client.post("/api/dossiers", json={
+            "type": category, "marque_id": 12, "model_id": 34,
+            "matricule": "LOCAL-123", "date_mise_en_circulation": "2020-05-17", **changes,
+        })
+        assert response.status_code == 201, response.text
+        return response.json()
+    return create
+
+
+@pytest.fixture
+def upload_photo(client):
+    def upload(dossier_id, side="front", phase=None, *, photo_id=None, content=None,
+               filename="vehicle.png", content_type="image/png"):
+        if content is None:
+            buffer = io.BytesIO()
+            Image.new("RGB", (20, 16), "blue").save(buffer, format="PNG")
+            content = buffer.getvalue()
+        fields = {"side": side}
+        if phase is not None:
+            fields["phase"] = phase
+        url = f"/api/dossiers/{dossier_id}/photos"
+        if photo_id:
+            return client.put(f"{url}/{photo_id}", data=fields, files={"file": (filename, content, content_type)})
+        return client.post(url, data=fields, files={"file": (filename, content, content_type)})
+    return upload

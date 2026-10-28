@@ -1,5 +1,10 @@
 # CABEK.AI — Application globale
 
+Application d'expertise automobile fondée sur le moteur Python, les modèles YOLO,
+AutoEstimate et le stockage de dossiers sur fichiers. L'API conserve l'expertise
+existante et ajoute le chiffrage rapide et les comparaisons photo avant/après.
+Le contrat frontend est décrit dans [docs/dossier-workflows-api.md](docs/dossier-workflows-api.md).
+
 ## API FastAPI
 
 Les endpoints de lecture des dossiers, résultats enregistrés, images et PDF sont

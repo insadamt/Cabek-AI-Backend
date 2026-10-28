@@ -1,3 +1,9 @@
+"""Run the existing expertise pipeline for expertise and quick-estimation inputs.
+
+Depends on existing YOLO models, pricing, and report generation; registration
+dates map to the supported pricing year through scans.vehicle.
+"""
+
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +19,7 @@ from scans.contracts import ScanRequest, ScanSummary
 from scans.pricing import enrichir_prix_pieces
 from scans.report import generate_report
 from scans.results import build_financial, build_result, prepare_invoice_instances
+from scans.vehicle import pricing_year
 
 
 # ============================================================
@@ -26,6 +33,8 @@ def load_models(models_dir: Path):
 
 
 def analyze_dossier(request: ScanRequest) -> ScanSummary:
+    if request.metadata.get("type") == "verification":
+        raise ValueError("AI analysis is disabled for verification dossiers.")
     request.output_dir.mkdir(parents=True, exist_ok=True)
     if (request.output_dir / "result.json").exists():
         raise FileExistsError("The output directory already has a final result.")
@@ -56,10 +65,9 @@ def analyze_dossier(request: ScanRequest) -> ScanSummary:
         instances = appliquer_feedback_aux_instances(instances, request.feedback)
     instances = appliquer_priorite_remplacement(instances)
     instances = prepare_invoice_instances(instances)
-    year = str(request.metadata.get("annee") or "")
     instances = enrichir_prix_pieces(
         instances, request.metadata.get("marque_id"), request.metadata.get("model_id"),
-        int(year) if year.isdigit() else None, {},
+        pricing_year(request.metadata), {},
     )
     aggregates = calculer_agregats(instances)
     financial = build_financial(instances)

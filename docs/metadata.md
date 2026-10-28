@@ -3,6 +3,9 @@
 Each dossier stores its inputs in `data/dossiers/<dossier_id>/metadata.json`.
 The API validates this file through `DossierMetadata` in `api/repository.py`;
 vehicle fields use `Vehicle` in `api/schemas.py`.
+This format preserves external expertise inputs while supporting local workflow
+creation; see [dossier-workflows-api.md](dossier-workflows-api.md) for the complete
+typed metadata, write-lock, evidence-history, and API contract.
 
 ## Current format
 
@@ -32,13 +35,24 @@ endpoints described in [api.md](api.md#vehicle-selection).
 | `matricule` | String; defaults to `""` when omitted |
 | `annee`, `date_sinistre` | Strings or `null`; default to `null` when omitted |
 | `created_at` | String or `null`; defaults to `null` when omitted |
+| `type` | `forfait_expertise` (default for legacy), `chiffrage_rapide`, or `verification`; independent of scan state |
+| `source` | `external` when absent; locally created dossiers save `cabek_ai` |
+| `updated_at` | UTC modification timestamp for local API writes |
+| `date_mise_en_circulation` | Complete valid ISO `YYYY-MM-DD`; required on local creation, optional for legacy |
+| `workflow_status` | Write-time snapshot; reads derive current category progress from saved inputs/scan artifacts |
+| `photo_history` | Replaced photo records with `replaced_at` and `replaced_by`; archived bytes are retained |
 | `photos` | Array of objects containing a string `path`; defaults to an empty array when omitted |
 
-Original photo paths must point directly under `photos/` and use JPEG or PNG
+Expertise and quick-estimation photo paths point directly under `photos/` and use JPEG or PNG
 extensions. Filename stems must be unique within the dossier. Write new paths
 with forward slashes; existing Windows-style separators remain supported.
 Every declared original must exist and pass image validation before a scan.
 An empty photo array can be read but cannot be scanned.
+Verification originals live under `photos/before/` or `photos/after/` and carry
+explicit `side`, `phase`, `photo_id`, and `uploaded_at`. Four sides are required
+per verification phase; one side is sufficient for quick estimation. Verification
+never scans. `before_finalized_at` locks before evidence when after collection
+starts; `evidence_finalized_at` locks the complete comparison, even after file loss.
 
 Existing collection fields such as `expert`, `status`, `updated_at`, and photo
 fields such as `view`, `view_label`, and `filename` may remain in the file.
@@ -63,7 +77,9 @@ ID migration. Do not guess IDs from names. Use
 selection; see [api.md](api.md#vehicle-selection) for validation and scan locks.
 
 API vehicle responses include both IDs, names, matricule, year, and accident
-date. Legacy records return `null` IDs. In dossier details, top-level `vehicle`
+date, plus optional full first-registration date. The pricing worker maps the
+full date to AutoEstimate's supported `year` parameter, falling back to `annee`
+for historical records. Legacy records return `null` IDs. In dossier details, top-level `vehicle`
 reflects current metadata; completed `result.vehicle` retains the analysis
 snapshot. Metadata has no `schema_version` field requirement; the saved analysis
 envelope separately uses `schema_version: 1` as described in

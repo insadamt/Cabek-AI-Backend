@@ -1,3 +1,9 @@
+"""Read existing dossiers and artifacts with additive workflow filters and detail.
+
+Depends on DossierService; synchronous handlers keep filesystem reads off the event loop.
+"""
+
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request
@@ -8,6 +14,7 @@ from api.errors import DossierError
 from api.previews import generate_webp_preview
 from api.schemas import DossierList, DossierResult, ErrorResponse, ScanState
 from api.service import DossierListQuery, DossierService
+from api.workflow_schemas import DossierSort, DossierType, WorkflowStatus
 
 
 # ============================================================
@@ -60,8 +67,20 @@ def list_dossiers(
     status: Annotated[ScanState | None, Query(description="Filter by saved analysis state.")] = None,
     limit: Annotated[int, Query(ge=1, le=100, description="Maximum items in this page.")] = 20,
     offset: Annotated[int, Query(ge=0, description="Matching items to skip before this page.")] = 0,
+    type: DossierType | None = None,
+    workflow_status: WorkflowStatus | None = None,
+    sort: DossierSort = "id_desc",
+    created_from: date | None = None,
+    created_to: date | None = None,
 ) -> DossierList:
-    return service.list_dossiers(DossierListQuery(search, status, limit, offset))
+    return service.list_dossiers(DossierListQuery(
+        search, status, limit, offset, type, workflow_status, sort, created_from, created_to,
+    ))
+
+
+@router.get("/{dossier_id}", response_model=DossierResult, summary="Read current dossier metadata and workflow")
+def read_dossier(dossier_id: DossierId, request: Request, service: ServiceDependency) -> DossierResult:
+    return service.read_result(dossier_id, request.scope.get("root_path", ""))
 
 
 # ============================================================

@@ -1,9 +1,12 @@
 # Saved analysis contract (version 1)
 
 This is the boundary between the standalone scan runner and the API. The runner
-copies orchestration and report code from Streamlit and calls the existing
-engine. Original engine, pricing client, barèmes, and Streamlit files stay
-untouched. HTTP handlers do not import YOLO or execute inference.
+copies orchestration and report code from Streamlit and calls the existing engine.
+It depends on existing YOLO models, pricing, and barèmes; HTTP handlers do not
+import YOLO or execute inference. The core engine and legacy Streamlit application
+remain unchanged. Expertise and quick estimation share this contract, with one
+valid photo sufficient. Verification does not use this pipeline; see
+[dossier-workflows-api.md](dossier-workflows-api.md).
 
 ```text
 data/dossiers/<dossier_id>/
@@ -107,7 +110,9 @@ served but need not be displayed by the frontend. Missing or unreadable required
 artifacts make final output invalid. Zero input photos cannot form a completed
 analysis.
 
-`vehicle` captures the metadata vehicle at analysis time, including both IDs.
+`vehicle` captures the metadata vehicle at analysis time, including both IDs and
+the full `date_mise_en_circulation` when present. Its year feeds the existing
+AutoEstimate `year` query parameter, with historical `annee` as fallback.
 Legacy analyses may omit IDs; API responses expose those IDs as `null`.
 The snapshot is distinct from the current top-level metadata vehicle returned
 by the dossier detail endpoint.

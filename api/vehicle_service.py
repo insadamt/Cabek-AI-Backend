@@ -1,3 +1,9 @@
+"""Resolve canonical vehicle selections and preserve existing scan input locks.
+
+Depends on AutoEstimate and atomic publishers; locally created categories also
+follow workflow edit rules so the legacy vehicle route cannot bypass finalization.
+"""
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -33,6 +39,16 @@ class VehicleSelectionService:
 
     def update_vehicle(self, dossier_id: str, selection: VehicleSelection) -> ResolvedVehicle:
         dossier = self.manager.repository.read_dossier(dossier_id)
+        if dossier.metadata.type != "forfait_expertise":
+            from api.workflow_service import WorkflowService
+            from api.workflow_schemas import PatchDossier
+
+            WorkflowService(self.manager, self.catalog).patch_dossier(
+                dossier_id, PatchDossier(**selection.model_dump()),
+            )
+            metadata = self.manager.repository.read_dossier(dossier_id).metadata
+            return ResolvedVehicle(**{key: getattr(metadata, key)
+                                      for key in ResolvedVehicle.model_fields})
         analysis_dir = self.manager.prepare_analysis_directory(dossier.directory)
         try:
 

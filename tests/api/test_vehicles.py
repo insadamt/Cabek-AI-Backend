@@ -1,3 +1,9 @@
+"""Regress canonical AutoEstimate selections, offline reads, and scan validation.
+
+Depends on mocked upstream reference responses and isolated dossier storage;
+full registration dates extend the existing vehicle response contract.
+"""
+
 import json
 from unittest.mock import Mock
 
@@ -43,6 +49,7 @@ def test_detail_exposes_metadata_vehicle_without_reference_lookup(
         "marque": "Dacia" if names_present else "",
         "modele": "Sandero" if names_present else "",
         "matricule": "TEST-123", "annee": None, "date_sinistre": None,
+        "date_mise_en_circulation": None,
     }
     assert data["vehicle"] == client.get("/api/dossiers").json()["items"][0]["vehicle"]
 

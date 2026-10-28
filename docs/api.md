@@ -1,7 +1,10 @@
 # Dossier API
 
-Read existing dossiers, start real analyses, and retrieve saved results, images,
-and PDFs. Only vehicle selection requires a JSON request body.
+Read dossiers, create quick-estimation/verification dossiers, upload photographs,
+start real analyses, and retrieve saved results, images, and PDFs. This contract
+depends on the existing file repository, AutoEstimate, and asynchronous scan worker.
+The complete creation, editing, comparison, and filtering contract is in
+[dossier-workflows-api.md](dossier-workflows-api.md).
 
 ## Run locally
 
@@ -108,6 +111,10 @@ Use for dashboard cards, search, filters, and counters.
 | --- | --- | --- |
 | `search` | Case-insensitive match against ID, marque, modèle, or matricule | Empty; maximum 200 characters |
 | `status` | Filter by saved analysis state | Any; `not_analyzed`, `queued`, `processing`, `completed`, `failed` |
+| `type` | Filter by dossier category | `forfait_expertise`, `chiffrage_rapide`, `verification` |
+| `workflow_status` | Filter by category progress | See [workflow states](dossier-workflows-api.md#workflow-state-and-scan-state) |
+| `sort` | ID or timestamp ordering | `id_desc` default; `id_asc`, `created_at_desc`, `created_at_asc`, `updated_at_desc`, `updated_at_asc` |
+| `created_from`, `created_to` | Inclusive UTC creation-date range | ISO dates `YYYY-MM-DD` |
 | `limit` | Maximum items returned | `20`; range `1–100` |
 | `offset` | Items to skip after filtering | `0`; zero or greater |
 
@@ -138,8 +145,10 @@ Example: `/api/dossiers?search=dacia&status=not_analyzed&limit=20&offset=0`.
 }
 ```
 
-`total` is the number matching search and status, before pagination. `counts`
-apply search but ignore the status filter and pagination. `photo_count` counts
+`total` matches all selected filters before pagination. `counts` apply search,
+dates, category, and workflow but ignore scan status and pagination. Additive
+`type_counts` ignore all state/category selectors; `workflow_counts` apply category
+but ignore both state selectors. Both apply search/dates. `photo_count` counts
 existing declared originals. Invalid folders are skipped and reported in
 `warnings` as `{dossier_id, code, message}`. No matches returns an empty list.
 
@@ -202,6 +211,8 @@ mid-photo.
 `422` invalid inputs; `503 worker_unavailable` for missing dependencies/models,
 a full queue, or a stopped worker. Stored failure codes include `scan_failed`,
 `scan_timeout`, `scan_interrupted`, and `scan_inputs_changed`.
+Quick-estimation dossiers require complete vehicle metadata and can scan one side.
+Verification dossiers always reject scans with `409 scan_disabled_for_type`.
 
 ## GET `/api/dossiers/{dossier_id}/result`
 
@@ -214,8 +225,10 @@ metadata returns null IDs. For completed analyses, `result.vehicle` remains the
 saved analysis snapshot while top-level `vehicle` reflects current metadata.
 The top-level `photos` array contains existing declared originals in every scan
 state, including before analysis. Missing originals are omitted; URLs include
-the deployment prefix. The separate `/photos` endpoint has been removed; use
-this response instead. The paginated dossier list continues to return `photo_count`.
+the deployment prefix. `GET /api/dossiers/{dossier_id}` returns this same detail.
+`GET /api/dossiers/{dossier_id}/photos` also lists originals, with optional phase
+filtering and paired verification slots. Detail/list responses add independent
+`type` and `workflow_status`. The paginated list still returns `photo_count`.
 
 **Needs:** an existing dossier ID, for example `DOS-001`. A completed result
 requires valid `analysis/result.json`, all declared originals and annotations,
@@ -397,7 +410,7 @@ Manual checklist:
 - With ID-only metadata, confirm IDs remain visible and names are empty; save through `PUT /vehicle` and confirm canonical names appear.
 - Confirm detail reads work without AutoEstimate and leave metadata unchanged.
 - Confirm completed details include originals in `photos` and annotations in `result.photos`.
-- Confirm the removed `/api/dossiers/{dossier_id}/photos` endpoint returns `404`.
+- Confirm `/api/dossiers/{dossier_id}/photos` returns originals before scanning and verification comparison slots.
 - POST a scan, poll real file counts, and confirm the final JSON/PDF open.
 - Confirm concurrent scans and successful rescans return `409`.
 - Retry a failed scan; verify incomplete outputs are cleared and progress starts from zero.

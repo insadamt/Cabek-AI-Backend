@@ -1,3 +1,9 @@
+"""Configure the local FastAPI integration and shared dossier/scan services.
+
+Depends on configured file storage and optional model workers; write endpoints
+share scan locks and remain inside the documented unauthenticated local boundary.
+"""
+
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -21,6 +27,9 @@ from scans.backend import ScanBackend
 from scans.jobs import ScanManager
 from api.vehicle_catalog import VehicleCatalog
 from api.vehicle_routes import router as vehicle_router
+from api.workflow_routes import router as workflow_router
+from api.workflow_service import WorkflowService
+from api.upload_limits import UploadLimitMiddleware
 
 
 # ============================================================
@@ -51,6 +60,8 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.state.dossier_service = DossierService(DossierRepository(settings.dossiers_dir))
     application.state.scan_manager = manager
     application.state.vehicle_catalog = VehicleCatalog()
+    application.state.workflow_service = WorkflowService(manager, application.state.vehicle_catalog)
+    application.add_middleware(UploadLimitMiddleware)
     application.add_exception_handler(DossierError, handle_dossier_error)
     application.add_exception_handler(RequestValidationError, handle_validation_error)
     application.add_exception_handler(HTTPException, handle_http_error)
@@ -61,13 +72,14 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
         application.add_middleware(
             CORSMiddleware,
             allow_origins=list(settings.cors_origins),
-            allow_methods=["GET", "POST", "PUT"],
+            allow_methods=["GET", "POST", "PUT", "PATCH"],
             allow_headers=["Accept", "Content-Type"],
             expose_headers=["Content-Disposition"],
         )
     application.include_router(router)
     application.include_router(scan_router)
     application.include_router(vehicle_router)
+    application.include_router(workflow_router)
     return application
 
 

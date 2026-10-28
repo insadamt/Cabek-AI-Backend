@@ -1,3 +1,9 @@
+"""Queue existing model scans under per-dossier admission and worker locks.
+
+Depends on file repositories, AutoEstimate validation, and subprocess supervision;
+verification dossiers are rejected before any scan files or jobs are created.
+"""
+
 from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
@@ -11,10 +17,11 @@ from filelock import FileLock, Timeout
 from api.config import ApiSettings
 from api.errors import DossierError
 from api.files import confined_path, read_json_object, validate_image
-from api.repository import DossierRepository
+from api.repository import DossierRecord, DossierRepository
 from api.schemas import DossierResult, ScanProgress
 from api.vehicle_catalog import VehicleCatalog, VehicleSelection
 from api.vehicle_service import save_vehicle_selection
+from api.workflow_state import vehicle_is_complete
 from scans.artifacts import input_signatures, publish_json, validate_outputs
 from scans.backend import ModelProcessBackend, ScanBackend
 from scans.cleanup import remove_incomplete_outputs
@@ -62,6 +69,7 @@ class ScanManager:
 
     def start_scan(self, dossier_id: str) -> DossierResult:
         dossier = self.repository.read_dossier(dossier_id)
+        self.reject_disabled_scan(dossier)
         analysis_dir = self.prepare_analysis_directory(dossier.directory)
         dossier_lock = FileLock(str(analysis_dir / ".scan.lock"), thread_local=False)
         reserved = False
@@ -75,8 +83,11 @@ class ScanManager:
 
                 with FileLock(str(analysis_dir / ".worker.lock"), timeout=0):
                     dossier = self.repository.read_dossier(dossier_id)
+                    self.reject_disabled_scan(dossier)
                     self.reject_completed_scan(dossier, analysis_dir)
                     self.reject_external_scan(analysis_dir)
+                    if dossier.metadata.type == "chiffrage_rapide" and not vehicle_is_complete(dossier.metadata):
+                        raise DossierError(422, "incomplete_vehicle_metadata", "Complete the vehicle metadata before scanning.")
                     if not dossier.photos:
                         raise DossierError(422, "no_valid_photos", "The dossier has no valid photos.")
                     for photo in dossier.photos.values():
@@ -107,6 +118,9 @@ class ScanManager:
                     raise DossierError(503, "worker_unavailable", "The scan worker is unavailable.") from error
             return DossierResult(
                 dossier_id=dossier_id, status="queued",
+                type=dossier.metadata.type, source=dossier.metadata.source,
+                created_at=dossier.metadata.created_at, updated_at=dossier.metadata.updated_at,
+                workflow_status="analyzing" if dossier.metadata.type == "chiffrage_rapide" else "queued",
                 vehicle=dossier.metadata,
                 progress=ScanProgress.model_validate(record["progress"]),
             )
@@ -119,6 +133,10 @@ class ScanManager:
             if isinstance(error, OSError):
                 raise DossierError(503, "storage_unavailable", "Scan storage is unavailable.") from error
             raise
+
+    def reject_disabled_scan(self, dossier: DossierRecord) -> None:
+        if dossier.metadata.type == "verification":
+            raise DossierError(409, "scan_disabled_for_type", "AI analysis is disabled for verification dossiers.")
 
     def run_job(self, job: ScanJob) -> None:
         try:

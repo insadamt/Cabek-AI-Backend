@@ -1,0 +1,129 @@
+"""Create and edit locally owned dossiers with atomic publication and scan locks.
+
+Depends on the existing scan manager, AutoEstimate catalog, and file publishers.
+Externally owned expertise inputs stay under their existing integration contract.
+"""
+
+from contextlib import contextmanager
+from datetime import datetime, timezone
+import shutil
+from typing import TYPE_CHECKING, Iterator
+from uuid import uuid4
+
+from filelock import FileLock, Timeout
+
+from api.errors import DossierError
+from api.files import confined_path, read_json_object
+from api.repository import DossierMetadata, DossierRecord
+from api.vehicle_catalog import VehicleCatalog, VehicleSelection
+from api.workflow_schemas import CreateDossier, PatchDossier
+from api.workflow_state import workflow_status
+from scans.artifacts import publish_json
+
+if TYPE_CHECKING:
+    from scans.jobs import ScanManager
+
+
+def timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+# ============================================================
+# LOCAL DOSSIER OWNERSHIP AND ATOMIC METADATA
+# ============================================================
+
+class WorkflowService:
+    def __init__(self, manager: "ScanManager", catalog: VehicleCatalog):
+        self.manager = manager
+        self.repository = manager.repository
+        self.catalog = catalog
+
+    def create_dossier(self, request: CreateDossier) -> str:
+        self.repository.validate_root()
+        vehicle = self.catalog.resolve(VehicleSelection(
+            marque_id=request.marque_id, model_id=request.model_id,
+        ))
+        dossier_id = f"DOS-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-{uuid4().hex}"
+        directory = self.repository.dossiers_dir / dossier_id
+        staging = self.repository.dossiers_dir / f".create-{uuid4().hex}"
+        now = timestamp()
+        metadata = {
+            **request.model_dump(), **vehicle.model_dump(), "dossier_id": dossier_id,
+            "source": "cabek_ai", "created_at": now, "updated_at": now,
+            "annee": request.date_mise_en_circulation[:4], "photos": [], "photo_history": [],
+            "workflow_status": "awaiting_photos" if request.type == "chiffrage_rapide" else "before_incomplete",
+        }
+        try:
+            (staging / "photos").mkdir(parents=True)
+            if request.type == "verification":
+                (staging / "photos/before").mkdir()
+                (staging / "photos/after").mkdir()
+            publish_json(staging / "metadata.json", metadata)
+
+            # The hidden staging folder keeps list readers from seeing half-created dossiers.
+
+            staging.rename(directory)
+        except OSError as error:
+            raise DossierError(503, "storage_unavailable", "Dossier could not be created.") from error
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging)
+        return dossier_id
+
+    @contextmanager
+    def editable_dossier(self, dossier_id: str) -> Iterator[DossierRecord]:
+        dossier = self.repository.read_dossier(dossier_id)
+        if dossier.metadata.type == "forfait_expertise":
+            raise DossierError(409, "externally_owned_dossier", "Expertise inputs are managed by the originating CABEK application.")
+        analysis_dir = self.manager.prepare_analysis_directory(dossier.directory)
+        try:
+
+            # Sharing admission and worker locks prevents edits racing queued or surviving scans.
+
+            with FileLock(str(analysis_dir / ".scan.lock"), timeout=0):
+                with FileLock(str(analysis_dir / ".worker.lock"), timeout=0):
+                    dossier = self.repository.read_dossier(dossier_id)
+                    self.manager.reject_completed_scan(dossier, analysis_dir)
+                    self.manager.reject_external_scan(analysis_dir)
+                    saved = read_json_object(dossier.directory / "metadata.json", "invalid_metadata")
+                    if dossier.metadata.type == "verification" and (saved.get("evidence_finalized_at") or workflow_status(dossier, "not_analyzed") == "comparison_ready"):
+                        raise DossierError(409, "evidence_finalized", "The complete comparison is immutable.")
+                    yield dossier
+        except Timeout as error:
+            raise DossierError(409, "scan_in_progress", "Dossier inputs cannot change during a scan.") from error
+        except OSError as error:
+            raise DossierError(503, "storage_unavailable", "Dossier inputs could not be saved.") from error
+
+    def save_metadata(self, dossier: DossierRecord, metadata: dict) -> None:
+        metadata["updated_at"] = timestamp()
+        validated = DossierMetadata.model_validate(metadata)
+        candidate = DossierRecord(dossier.directory, validated,
+                                  self.repository.photo_manifest(dossier.directory, validated))
+        analysis = self.repository.read_analysis(candidate)
+        metadata["workflow_status"] = workflow_status(candidate, self.repository.read_state(candidate, analysis))
+        if metadata["type"] == "verification":
+
+            # A deleted or corrupted file must not unlock evidence that was already finalized.
+
+            if any(photo.phase == "after" for photo in validated.photos):
+                metadata.setdefault("before_finalized_at", timestamp())
+            if metadata["workflow_status"] == "comparison_ready":
+                metadata.setdefault("evidence_finalized_at", timestamp())
+        publish_json(confined_path(dossier.directory, "metadata.json"), metadata)
+
+    def patch_dossier(self, dossier_id: str, request: PatchDossier) -> None:
+        changes = request.model_dump(exclude_unset=True)
+        if not changes or any(value is None for value in changes.values()):
+            raise DossierError(422, "invalid_metadata_update", "Provide at least one non-null editable field.")
+        if ("marque_id" in changes) != ("model_id" in changes):
+            raise DossierError(422, "invalid_vehicle_selection", "Provide both vehicle IDs together.")
+        with self.editable_dossier(dossier_id) as dossier:
+            if "marque_id" in changes:
+                changes.update(self.catalog.resolve(VehicleSelection(
+                    marque_id=changes["marque_id"], model_id=changes["model_id"],
+                )).model_dump())
+            if "date_mise_en_circulation" in changes:
+                changes["annee"] = changes["date_mise_en_circulation"][:4]
+            metadata = read_json_object(dossier.directory / "metadata.json", "invalid_metadata")
+            metadata.update(changes)
+            self.save_metadata(dossier, metadata)
