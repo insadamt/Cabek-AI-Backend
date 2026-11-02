@@ -1,9 +1,12 @@
 # Saved analysis contract (version 1)
 
 This is the boundary between the standalone scan runner and the API. The runner
-copies orchestration and report code from Streamlit and calls the existing
-engine. Original engine, pricing client, barèmes, and Streamlit files stay
-untouched. HTTP handlers do not import YOLO or execute inference.
+copies orchestration and report code from Streamlit and calls the existing engine.
+It depends on existing YOLO models, pricing, and barèmes; HTTP handlers do not
+import YOLO or execute inference. The core engine and legacy Streamlit application
+remain unchanged. Expertise and quick estimation share this contract, with one
+valid photo sufficient. Verification does not use this pipeline; see
+[dossier-workflows-api.md](dossier-workflows-api.md).
 
 ```text
 data/dossiers/<dossier_id>/
@@ -18,7 +21,8 @@ data/dossiers/<dossier_id>/
     result.json                 # publish last
 ```
 
-Metadata must contain a matching `dossier_id` and a `photos` array of objects
+The input file follows [metadata.md](metadata.md). Metadata must contain a
+matching `dossier_id`; scans require a nonempty `photos` array of objects
 containing `path`. Originals must be directly under `photos/`. Photo IDs are
 the original filename without its extension, unique within the dossier.
 The existing repository's Windows-style photo paths are supported.
@@ -29,6 +33,9 @@ validates their relationship against AutoEstimate and saves canonical `marque`
 and `modele` labels. Scan admission repeats validation for ID-based dossiers
 before taking the input snapshot. Saved labels keep reads available offline;
 legacy name-only dossiers remain supported. Do not guess IDs from vehicle names.
+ID-only metadata is readable with empty labels; legacy null names are read as
+empty strings without rewriting the file. Use `model_id`, not `modele_id`.
+Numeric IDs must never be stored in the name fields.
 
 The runner writes into a backend-supplied output directory and publishes each
 artifact by writing a temporary sibling file, closing it, then renaming it.
@@ -61,10 +68,12 @@ ignored by Git.
   "schema_version": 1,
   "dossier_id": "DOS-001",
   "vehicle": {
+    "marque_id": 12,
+    "model_id": 34,
     "marque": "Dacia",
-    "modele": "Logan",
+    "modele": "Sandero",
     "matricule": "EXAMPLE",
-    "annee": "2015",
+    "annee": "2020",
     "date_sinistre": null
   },
   "financial": {
@@ -101,6 +110,13 @@ served but need not be displayed by the frontend. Missing or unreadable required
 artifacts make final output invalid. Zero input photos cannot form a completed
 analysis.
 
+`vehicle` captures the metadata vehicle at analysis time, including both IDs and
+the full `date_mise_en_circulation` when present. Its year feeds the existing
+AutoEstimate `year` query parameter, with historical `annee` as fallback.
+Legacy analyses may omit IDs; API responses expose those IDs as `null`.
+The snapshot is distinct from the current top-level metadata vehicle returned
+by the dossier detail endpoint.
+
 Financial amounts must be finite and nonnegative. `known_subtotal` equals the sum
 of known breakdown amounts (within one cent). `complete` requires every breakdown
 amount and a matching numeric `estimated_total`. `incomplete` requires
@@ -125,3 +141,11 @@ validated metadata, photo manifest, feedback, model directory, and the cleaned
 `analysis/` directory. It writes artifacts there and raises on failure. The API
 handles admission, locks, retry cleanup, process lifetime, input-change checks,
 and completion validation. No progress callback is required.
+
+## WebP display previews
+
+The API derives WebP display previews on demand from allowlisted original or
+annotation files. These are held in a bounded memory cache, never saved alongside
+runner artifacts, and do not affect output validation or scan completion.
+Saved paths and version 1 annotations remain JPEG/PNG as specified above.
+See [api.md](api.md) for preview URLs, image dimensions, quality, and HTTP caching.

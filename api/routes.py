@@ -1,11 +1,20 @@
+"""Read existing dossiers and artifacts with additive workflow filters and detail.
+
+Depends on DossierService; synchronous handlers keep filesystem reads off the event loop.
+"""
+
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from api.files import IMAGE_MEDIA_TYPES
+from api.errors import DossierError
+from api.previews import generate_webp_preview
 from api.schemas import DossierList, DossierResult, ErrorResponse, ScanState
 from api.service import DossierListQuery, DossierService
+from api.workflow_schemas import DossierSort, DossierType, WorkflowStatus
 
 
 # ============================================================
@@ -58,8 +67,20 @@ def list_dossiers(
     status: Annotated[ScanState | None, Query(description="Filter by saved analysis state.")] = None,
     limit: Annotated[int, Query(ge=1, le=100, description="Maximum items in this page.")] = 20,
     offset: Annotated[int, Query(ge=0, description="Matching items to skip before this page.")] = 0,
+    type: DossierType | None = None,
+    workflow_status: WorkflowStatus | None = None,
+    sort: DossierSort = "id_desc",
+    created_from: date | None = None,
+    created_to: date | None = None,
 ) -> DossierList:
-    return service.list_dossiers(DossierListQuery(search, status, limit, offset))
+    return service.list_dossiers(DossierListQuery(
+        search, status, limit, offset, type, workflow_status, sort, created_from, created_to,
+    ))
+
+
+@router.get("/{dossier_id}", response_model=DossierResult, summary="Read current dossier metadata and workflow")
+def read_dossier(dossier_id: DossierId, request: Request, service: ServiceDependency) -> DossierResult:
+    return service.read_result(dossier_id, request.scope.get("root_path", ""))
 
 
 # ============================================================
@@ -71,7 +92,8 @@ def list_dossiers(
     description=(
         "Requires an existing dossier ID. Returns saved vehicle, financial, part, detection, "
         "and photo data with image/PDF URLs when final artifacts are valid. "
-        "Without final output, result is null. Managed scans return real artifact counts in progress. "
+        "Metadata vehicle and original photos are always included; without final output, result is null. "
+        "Vehicle reads use saved IDs and names without reference lookups. Managed scans return real artifact counts in progress. "
         "A completed scan may have incomplete finances. Does not start a scan."
     ),
     response_description="Saved analysis state and nullable result.",
@@ -106,6 +128,40 @@ def read_media(
         headers={"X-Content-Type-Options": "nosniff"},
         content_disposition_type="inline",
     )
+
+
+# ============================================================
+# COMPRESSED DISPLAY PREVIEWS
+# ============================================================
+
+@router.get(
+    "/{dossier_id}/preview/{path:path}", response_class=Response,
+    summary="Read a compressed WebP preview",
+    description=(
+        "Use returned preview URLs. Append .webp to an allowlisted source path. "
+        "Preserves aspect ratio, limits the longest edge to 1600 pixels, and uses quality 82. "
+        "Original media and saved analysis files are preserved."
+    ),
+    responses={200: {"content": {"image/webp": {}}}, 304: {"description": "Preview unchanged"}},
+)
+def read_preview(
+    dossier_id: DossierId, path: str, request: Request, service: ServiceDependency,
+) -> Response:
+    if not path.endswith(".webp"):
+        raise DossierError(404, "artifact_not_found", "Artifact not found.")
+
+    # Validate the source on every request, including cache hits and conditional requests.
+
+    source = service.media_path(dossier_id, path[:-5])
+    content, etag = generate_webp_preview(source)
+    headers = {
+        "ETag": etag, "Cache-Control": "private, no-cache",
+        "X-Content-Type-Options": "nosniff",
+    }
+    requested_etags = [value.strip().removeprefix("W/") for value in request.headers.get("if-none-match", "").split(",")]
+    if etag in requested_etags or "*" in requested_etags:
+        return Response(status_code=304, headers=headers)
+    return Response(content, media_type="image/webp", headers=headers)
 
 
 # ============================================================

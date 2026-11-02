@@ -11,17 +11,18 @@
   "status": "À valider",
   "photos": [
     {
-      "path": "photos\\arriere_01.jpeg"
+      "path": "photos/arriere_01.jpg"
     },
     {
-      "path": "photos\\details_01.jpg"
+      "path": "photos/details_01.jpg"
     },
     {
-      "path": "photos\\droite_01.jpg"
+      "path": "photos/droite_01.jpg"
     },
     {
-      "path": "photos\\avant_01.jpg"
+      "path": "photos/avant_01.jpg"
     }
   ],
-  "updated_at": "2026-09-26T04:25:05"
+  "updated_at": "2026-10-23T09:33:33.103073+00:00",
+  "date_sinistre": null
 }

@@ -1,7 +1,12 @@
+"""Read legacy and typed dossiers and validate allowlisted original/analysis files.
+
+Depends on file confinement, Pydantic schemas, and saved artifacts; reads never migrate data.
+"""
+
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from api.errors import DossierError
 from api.files import (
@@ -14,6 +19,7 @@ from api.files import (
     validate_pdf,
 )
 from api.schemas import ScanProgress, ScanState, StoredAnalysis, StoredPhoto, Vehicle
+from api.workflow_schemas import DossierType, PhotoSide, PhotoPhase, validate_registration_date
 
 
 # ============================================================
@@ -22,17 +28,47 @@ from api.schemas import ScanProgress, ScanState, StoredAnalysis, StoredPhoto, Ve
 
 class PhotoMetadata(BaseModel):
     path: str
+    side: PhotoSide | None = None
+    phase: PhotoPhase | None = None
+    uploaded_at: str | None = None
 
 
 class DossierMetadata(Vehicle):
     dossier_id: str
+    type: DossierType = "forfait_expertise"
+    source: str = "external"
     created_at: str | None = None
+    updated_at: str | None = None
+    before_finalized_at: str | None = None
+    evidence_finalized_at: str | None = None
     photos: list[PhotoMetadata] = Field(default_factory=list)
 
+    @field_validator("marque", "modele", mode="before")
+    @classmethod
+    def normalize_missing_vehicle_names(cls, value):
+
+        # Legacy metadata uses null for unknown names; IDs remain the source of vehicle identity.
+
+        return "" if value is None else value
+
     @model_validator(mode="after")
-    def validate_vehicle_ids(self):
+    def validate_vehicle_and_photo_identity(self):
         if (self.marque_id is None) != (self.model_id is None):
             raise ValueError("Vehicle IDs must be provided together.")
+        if self.date_mise_en_circulation is not None:
+            validate_registration_date(self.date_mise_en_circulation)
+        if self.type != "forfait_expertise":
+            slots = set()
+            for photo in self.photos:
+                if photo.side is None:
+                    raise ValueError("Workflow photos require a side.")
+                if self.type == "verification":
+                    slot = (photo.phase, photo.side)
+                    if photo.phase is None or slot in slots:
+                        raise ValueError("Verification requires unique phase/side slots.")
+                    slots.add(slot)
+                elif photo.phase is not None:
+                    raise ValueError("Quick estimates have no before/after phase.")
         return self
 
 
@@ -103,7 +139,9 @@ class DossierRepository:
             try:
                 original = normalize_relative_path(photo.path, legacy=True)
                 path = PurePosixPath(original)
-                if len(path.parts) != 2 or path.parts[0] != "photos":
+                verification_path = (metadata.type == "verification" and len(path.parts) == 3
+                                     and path.parts[:2] == ("photos", photo.phase))
+                if not verification_path and (metadata.type == "verification" or len(path.parts) != 2 or path.parts[0] != "photos"):
                     raise ValueError("Original must be directly under photos.")
                 if path.suffix.lower() not in IMAGE_TYPES or path.stem in photos:
                     raise ValueError("Unsupported image or duplicate photo ID.")
@@ -128,6 +166,8 @@ class DossierRepository:
     # ============================================================
 
     def read_analysis(self, dossier: DossierRecord) -> StoredAnalysis | None:
+        if dossier.metadata.type == "verification":
+            return None
 
         # A managed worker can write JSON just before failing; wait for its validated verdict.
 
@@ -171,6 +211,8 @@ class DossierRepository:
     # ============================================================
 
     def read_state(self, dossier: DossierRecord, analysis: StoredAnalysis | None) -> ScanState:
+        if dossier.metadata.type == "verification":
+            return "not_analyzed"
 
         # Validated artifacts establish completion even if a saved status file is stale.
 
@@ -192,6 +234,8 @@ class DossierRepository:
     # ============================================================
 
     def read_progress(self, dossier: DossierRecord) -> ScanProgress | None:
+        if dossier.metadata.type == "verification":
+            return None
         path = confined_path(dossier.directory, "analysis/status.json")
         if not path.is_file():
             return None
@@ -223,7 +267,7 @@ class DossierRepository:
             value
             for photo in dossier.photos.values()
             for key, value in photo.model_dump().items()
-            if key != "photo_id"
+            if key != "photo_id" and (dossier.metadata.type != "verification" or key == "original_path")
         }
         if relative_path not in allowlist:
             raise DossierError(404, "artifact_not_found", "Artifact not found.")

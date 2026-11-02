@@ -1,7 +1,13 @@
+"""Existing scan and dashboard responses, extended with independent workflow fields.
+
+Depends on Pydantic and shared workflow contracts; saved financial semantics stay unchanged.
+"""
+
 from math import isclose
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from api.workflow_schemas import DossierType, PhotoPhase, PhotoSide, WorkflowStatus
 
 
 # ============================================================
@@ -23,6 +29,7 @@ class Vehicle(BaseModel):
     modele: str = ""
     matricule: str = ""
     annee: str | None = None
+    date_mise_en_circulation: str | None = None
     date_sinistre: str | None = None
 
 
@@ -98,12 +105,42 @@ class StoredAnalysis(BaseModel):
 # FRONTEND RESULT CONTRACT
 # ============================================================
 
+class OriginalPhoto(BaseModel):
+    photo_id: str
+    original_url: str
+    preview_url: str
+
+
+class WorkflowPhoto(OriginalPhoto):
+    side: PhotoSide
+    phase: PhotoPhase | None = None
+    uploaded_at: str | None = None
+
+
+class ComparisonSlot(BaseModel):
+    side: PhotoSide
+    before: WorkflowPhoto | None = None
+    after: WorkflowPhoto | None = None
+
+
+class VerificationComparison(BaseModel):
+    slots: list[ComparisonSlot]
+    missing_before: list[PhotoSide]
+    missing_after: list[PhotoSide]
+    before_locked: bool = False
+    finalized: bool = False
+
+
 class PhotoUrls(BaseModel):
     photo_id: str
     original_url: str
     parts_url: str
     damages_url: str
     critical_url: str
+    original_preview_url: str
+    parts_preview_url: str
+    damages_preview_url: str
+    critical_preview_url: str
 
 
 class AnalysisResult(BaseModel):
@@ -147,7 +184,17 @@ class ScanProgress(BaseModel):
 
 class DossierResult(BaseModel):
     dossier_id: str
+    type: DossierType = "forfait_expertise"
+    source: str = "external"
+    created_at: str | None = None
+    updated_at: str | None = None
+    workflow_status: WorkflowStatus = "not_analyzed"
+    comparison: VerificationComparison | None = None
+    vehicle: Vehicle = Field(description="Current saved metadata vehicle, available in every scan state.")
     status: ScanState
+    photos: list[WorkflowPhoto | OriginalPhoto] = Field(
+        default_factory=list, description="Existing original photos, available before analysis."
+    )
 
     # Unscanned dossiers have no progress; managed scans expose observed file counts.
 
@@ -162,6 +209,10 @@ class DossierResult(BaseModel):
 
 class DossierSummary(BaseModel):
     dossier_id: str
+    type: DossierType = "forfait_expertise"
+    source: str = "external"
+    workflow_status: WorkflowStatus = "not_analyzed"
+    updated_at: str | None = None
     vehicle: Vehicle
     created_at: str | None = None
     status: ScanState
@@ -187,6 +238,8 @@ class DossierList(BaseModel):
     items: list[DossierSummary]
     total: int = Field(description="Matches after search and status filtering, before pagination.")
     counts: DossierCounts = Field(description="Counts after search, before status filtering and pagination.")
+    type_counts: dict[str, int] = Field(default_factory=dict)
+    workflow_counts: dict[str, int] = Field(default_factory=dict)
     limit: int
     offset: int
     warnings: list[DossierWarning] = Field(description="Folders skipped because their saved data is unavailable or invalid.")

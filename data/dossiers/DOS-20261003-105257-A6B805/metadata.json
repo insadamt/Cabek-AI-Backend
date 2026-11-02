@@ -14,32 +14,33 @@
       "view": "avant",
       "view_label": "Vue avant",
       "filename": "avant_01.jpeg",
-      "path": "photos\\avant_01.jpeg"
+      "path": "photos/avant_01.jpeg"
     },
     {
       "view": "arriere",
       "view_label": "Vue arrière",
       "filename": "arriere_01.jpeg",
-      "path": "photos\\arriere_01.jpeg"
+      "path": "photos/arriere_01.jpeg"
     },
     {
       "view": "gauche",
       "view_label": "Vue gauche",
       "filename": "gauche_01.jpeg",
-      "path": "photos\\gauche_01.jpeg"
+      "path": "photos/gauche_01.jpeg"
     },
     {
       "view": "droite",
       "view_label": "Vue droite",
       "filename": "droite_01.jpeg",
-      "path": "photos\\droite_01.jpeg"
+      "path": "photos/droite_01.jpeg"
     },
     {
       "view": "details",
       "view_label": "Détails dommages",
       "filename": "details_01.jpeg",
-      "path": "photos\\details_01.jpeg"
+      "path": "photos/details_01.jpeg"
     }
   ],
-  "updated_at": "2026-10-07T12:02:53"
+  "updated_at": "2026-10-23T15:45:52.265771+00:00",
+  "date_sinistre": null
 }

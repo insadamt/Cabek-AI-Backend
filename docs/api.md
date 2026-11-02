@@ -1,7 +1,10 @@
 # Dossier API
 
-Read existing dossiers, start real analyses, and retrieve saved results, images,
-and PDFs. Only vehicle selection requires a JSON request body.
+Read dossiers, create quick-estimation/verification dossiers, upload photographs,
+start real analyses, and retrieve saved results, images, and PDFs. This contract
+depends on the existing file repository, AutoEstimate, and asynchronous scan worker.
+The complete creation, editing, comparison, and filtering contract is in
+[dossier-workflows-api.md](dossier-workflows-api.md).
 
 ## Run locally
 
@@ -72,7 +75,8 @@ Names cannot be supplied in this request. Invalid IDs or relationships return
 `422`; unknown dossier `404`; active or completed scans `409`; unavailable
 AutoEstimate or storage `503`. Failed validation leaves metadata unchanged.
 
-Saved vehicle metadata looks like:
+Saved vehicle metadata looks like the example below. The full file contract and
+legacy compatibility rules are documented in [metadata.md](metadata.md).
 
 ```json
 {
@@ -82,6 +86,7 @@ Saved vehicle metadata looks like:
   "marque": "Dacia",
   "modele": "Sandero",
   "annee": "2020",
+  "date_sinistre": null,
   "matricule": "EXAMPLE",
   "photos": [{"path": "photos/avant_01.jpg"}]
 }
@@ -92,6 +97,9 @@ without automatic migration. When IDs are present, scan admission revalidates
 them and refreshes saved names before capturing inputs; AutoEstimate must be
 reachable. Dashboard/result reads use saved names without network calls. New
 analysis vehicle objects include both IDs; legacy results may return null IDs.
+Legacy null `marque` and `modele` metadata values are read as empty names without
+rewriting the file. Numeric IDs belong in `marque_id` and `model_id`, not name
+fields; the model ID key is `model_id` (not `modele_id`).
 
 ## GET `/api/dossiers`
 
@@ -103,6 +111,10 @@ Use for dashboard cards, search, filters, and counters.
 | --- | --- | --- |
 | `search` | Case-insensitive match against ID, marque, modèle, or matricule | Empty; maximum 200 characters |
 | `status` | Filter by saved analysis state | Any; `not_analyzed`, `queued`, `processing`, `completed`, `failed` |
+| `type` | Filter by dossier category | `forfait_expertise`, `chiffrage_rapide`, `verification` |
+| `workflow_status` | Filter by category progress | See [workflow states](dossier-workflows-api.md#workflow-state-and-scan-state) |
+| `sort` | ID or timestamp ordering | `id_desc` default; `id_asc`, `created_at_desc`, `created_at_asc`, `updated_at_desc`, `updated_at_asc` |
+| `created_from`, `created_to` | Inclusive UTC creation-date range | ISO dates `YYYY-MM-DD` |
 | `limit` | Maximum items returned | `20`; range `1–100` |
 | `offset` | Items to skip after filtering | `0`; zero or greater |
 
@@ -115,8 +127,8 @@ Example: `/api/dossiers?search=dacia&status=not_analyzed&limit=20&offset=0`.
   "items": [{
     "dossier_id": "DOS-001",
     "vehicle": {
-      "marque": "Dacia", "modele": "Logan", "matricule": "EXAMPLE",
-      "annee": "2015", "date_sinistre": null
+      "marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero",
+      "matricule": "EXAMPLE", "annee": "2020", "date_sinistre": null
     },
     "created_at": "2026-10-17T09:00:00",
     "status": "not_analyzed",
@@ -133,8 +145,10 @@ Example: `/api/dossiers?search=dacia&status=not_analyzed&limit=20&offset=0`.
 }
 ```
 
-`total` is the number matching search and status, before pagination. `counts`
-apply search but ignore the status filter and pagination. `photo_count` counts
+`total` matches all selected filters before pagination. `counts` apply search,
+dates, category, and workflow but ignore scan status and pagination. Additive
+`type_counts` ignore all state/category selectors; `workflow_counts` apply category
+but ignore both state selectors. Both apply search/dates. `photo_count` counts
 existing declared originals. Invalid folders are skipped and reported in
 `warnings` as `{dossier_id, code, message}`. No matches returns an empty list.
 
@@ -155,6 +169,11 @@ files and scan dependencies must be available.
 {
   "dossier_id": "DOS-001",
   "status": "queued",
+  "vehicle": {
+    "marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero",
+    "matricule": "EXAMPLE", "annee": "2020", "date_sinistre": null
+  },
+  "photos": [],
   "progress": {
     "stage": "queued",
     "annotations_ready": 0,
@@ -192,10 +211,24 @@ mid-photo.
 `422` invalid inputs; `503 worker_unavailable` for missing dependencies/models,
 a full queue, or a stopped worker. Stored failure codes include `scan_failed`,
 `scan_timeout`, `scan_interrupted`, and `scan_inputs_changed`.
+Quick-estimation dossiers require complete vehicle metadata and can scan one side.
+Verification dossiers always reject scans with `409 scan_disabled_for_type`.
 
 ## GET `/api/dossiers/{dossier_id}/result`
 
-Use for the saved expertise screen. This endpoint does not start a scan.
+Use for dossier details and the saved expertise screen. This endpoint does not start a scan.
+The top-level `vehicle` contains saved metadata IDs and names in every scan state,
+including before analysis. Reads do not call AutoEstimate or update metadata.
+ID-only metadata returns its IDs with empty names; use the vehicle-selection PUT
+to validate those IDs and save canonical names before analysis. Legacy name-only
+metadata returns null IDs. For completed analyses, `result.vehicle` remains the
+saved analysis snapshot while top-level `vehicle` reflects current metadata.
+The top-level `photos` array contains existing declared originals in every scan
+state, including before analysis. Missing originals are omitted; URLs include
+the deployment prefix. `GET /api/dossiers/{dossier_id}` returns this same detail.
+`GET /api/dossiers/{dossier_id}/photos` also lists originals, with optional phase
+filtering and paired verification slots. Detail/list responses add independent
+`type` and `workflow_status`. The paginated list still returns `photo_count`.
 
 **Needs:** an existing dossier ID, for example `DOS-001`. A completed result
 requires valid `analysis/result.json`, all declared originals and annotations,
@@ -207,6 +240,15 @@ and `analysis/report.pdf`.
 {
   "dossier_id": "DOS-001",
   "status": "not_analyzed",
+  "vehicle": {
+    "marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero",
+    "matricule": "EXAMPLE", "annee": "2020", "date_sinistre": null
+  },
+  "photos": [{
+    "photo_id": "avant_01",
+    "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg",
+    "preview_url": "/api/dossiers/DOS-001/preview/photos/avant_01.jpg.webp"
+  }],
   "progress": null,
   "error": null,
   "result": null
@@ -218,7 +260,7 @@ For a completed analysis, `status` is `completed` and `result` contains:
 | Field | Returned value |
 | --- | --- |
 | `schema_version` | `1` |
-| `vehicle` | Same vehicle fields as the listing; missing year/date stays `null` |
+| `vehicle` | Saved analysis snapshot with the same vehicle fields as the listing, including both IDs; legacy IDs and missing year/date stay `null` |
 | `financial` | Completeness, currency, totals, breakdown, and warnings; example below |
 | `parts` | Part ID, name, action (`repair`/`replace`), financial details, detection IDs, source images |
 | `detections` | Existing engine detections, including severity, confidence, feedback, and costs |
@@ -247,7 +289,7 @@ An incomplete financial result can belong to a **completed scan**:
 `known_subtotal` adds known breakdown amounts. A complete estimate has every
 amount and a numeric `estimated_total`; unknown costs remain `null`.
 
-Each entry in `photos` has this shape:
+Each entry in `result.photos` has this shape:
 
 ```json
 {
@@ -255,11 +297,18 @@ Each entry in `photos` has this shape:
   "original_url": "/api/dossiers/DOS-001/media/photos/avant_01.jpg",
   "parts_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_pieces.png",
   "damages_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_dommages.png",
-  "critical_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_critical.png"
+  "critical_url": "/api/dossiers/DOS-001/media/analysis/annotated/avant_01_critical.png",
+  "original_preview_url": "/api/dossiers/DOS-001/preview/photos/avant_01.jpg.webp",
+  "parts_preview_url": "/api/dossiers/DOS-001/preview/analysis/annotated/avant_01_pieces.png.webp",
+  "damages_preview_url": "/api/dossiers/DOS-001/preview/analysis/annotated/avant_01_dommages.png.webp",
+  "critical_preview_url": "/api/dossiers/DOS-001/preview/analysis/annotated/avant_01_critical.png.webp"
 }
 ```
 
-Use the returned URLs directly. Critical-zone images need not appear in the UI.
+Use the returned URLs directly. For display, use top-level `photos[].preview_url`
+and `result.photos[].*_preview_url`. Existing `*_url` media fields still serve
+the full saved files for downloads or detailed inspection. Critical-zone images
+need not appear in the UI. Load annotations only when their view is opened.
 
 `progress` is `null` before a managed scan exists. During a scan, it contains
 observed output counts as shown above. The last snapshot remains available on
@@ -288,6 +337,32 @@ Windows-style paths in existing metadata are supported internally.
 
 **Errors:** `404` unknown dossier or missing/disallowed image; `422` invalid ID,
 metadata, or unreadable image; `503` storage unavailable.
+
+## GET `/api/dossiers/{dossier_id}/preview/{path}.webp`
+
+Use the returned preview URLs for the viewer and comparison slider. The source
+extension is preserved before `.webp`, for example `photos/avant_01.jpg.webp`
+or `analysis/annotated/avant_01_pieces.png.webp`.
+
+**Returns `200`:** `image/webp` bytes, encoded at quality 82, with the longest
+edge limited to 1600 pixels. Aspect ratio is preserved and small images are
+not enlarged. Pixel orientation is preserved to align originals and annotations.
+Original files, saved PNG annotations, inference inputs, and PDFs are unchanged.
+WebP is a display format; scan inputs still require JPEG/PNG.
+
+Previews are generated on demand and kept in a bounded in-memory cache of
+16 entries per API process. No preview files are written to dossier storage.
+Source identity, size, and modification/change times invalidate cache entries;
+restart or eviction requires encoding again. Pillow must have WebP support.
+
+Responses include `ETag` and `Cache-Control: private, no-cache`, allowing browser
+storage with revalidation. Send `If-None-Match` to receive `304` with no body
+when unchanged. The original media allowlist and image validation run even on
+cache hits and conditional requests. Cached images cannot bypass deleted,
+invalid, or disallowed sources.
+
+**Errors:** `404` missing/disallowed source or missing `.webp` suffix; `422`
+invalid ID, metadata, or unreadable image; `503` storage unavailable.
 
 ## GET `/api/dossiers/{dossier_id}/report`
 
@@ -330,7 +405,12 @@ Manual checklist:
 - Open `/docs` using each printed URL.
 - List, search, filter, and paginate dossiers in `/docs`.
 - Confirm counts remain useful when filtering by status.
-- Read an unscanned dossier and open an existing original image.
+- Read an unscanned dossier and open an image from the top-level `photos` array.
+- Confirm top-level `vehicle` exposes saved IDs and names before analysis and in queued, processing, failed, and completed states.
+- With ID-only metadata, confirm IDs remain visible and names are empty; save through `PUT /vehicle` and confirm canonical names appear.
+- Confirm detail reads work without AutoEstimate and leave metadata unchanged.
+- Confirm completed details include originals in `photos` and annotations in `result.photos`.
+- Confirm `/api/dossiers/{dossier_id}/photos` returns originals before scanning and verification comparison slots.
 - POST a scan, poll real file counts, and confirm the final JSON/PDF open.
 - Confirm concurrent scans and successful rescans return `409`.
 - Retry a failed scan; verify incomplete outputs are cleared and progress starts from zero.
@@ -338,3 +418,15 @@ Manual checklist:
 - Once real outputs exist, inspect the result and follow its image/PDF URLs.
 - Restart the API and reopen a saved result.
 - Check unknown IDs, invalid parameters, and disallowed file paths.
+
+WebP preview manual checklist:
+
+- Open an unscanned dossier's `photos[].preview_url`; confirm `image/webp`.
+- Open all four completed `*_preview_url` values, including behind a proxy prefix.
+- Compare fine scratches, labels, and damage boundaries against the full saved image.
+- Confirm original and annotation previews align in the comparison slider.
+- Check the longest edge is at most 1600 pixels and smaller images are not enlarged.
+- Compare transferred bytes and loading time in browser DevTools.
+- Revalidate with `If-None-Match`; expect `304`, then change the source and expect `200` with a new ETag.
+- Confirm original downloads, scan inputs, and saved analysis files are unchanged.
+- Confirm missing, corrupt, undeclared, and escaping source paths remain blocked.

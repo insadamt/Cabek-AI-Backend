@@ -1,0 +1,355 @@
+{
+  "dossier_id": "stress",
+  "marque": "Dacia",
+  "marque_id": 10,
+  "modele": "Sandero",
+  "model_id": 75,
+  "annee": "2026",
+  "matricule": "Stress",
+  "expert": "",
+  "created_at": "2026-10-03T10:52:57",
+  "status": "À valider",
+  "photos": [
+    {
+      "filename": "2__48236-A-14_AVANT_2026-10-01 10_30_10.jpeg",
+      "path": "photos/2__48236-A-14_AVANT_2026-10-01 10_30_10.jpeg",
+      "source_dossier_id": "2",
+      "source_path": "photos/48236-A-14_AVANT_2026-10-01 10_30_10.jpeg"
+    },
+    {
+      "filename": "2__N_78512_6abe362cde8582.87630184.jpeg",
+      "path": "photos/2__N_78512_6abe362cde8582.87630184.jpeg",
+      "source_dossier_id": "2",
+      "source_path": "photos/N_78512_6abe362cde8582.87630184.jpeg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20260915-111935-9B5786__arriere_01.jpg",
+      "path": "photos/DOS-20260915-111935-9B5786__arriere_01.jpg",
+      "source_dossier_id": "DOS-20260915-111935-9B5786",
+      "source_path": "photos/arriere_01.jpg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20260915-111935-9B5786__avant_01.jpg",
+      "path": "photos/DOS-20260915-111935-9B5786__avant_01.jpg",
+      "source_dossier_id": "DOS-20260915-111935-9B5786",
+      "source_path": "photos/avant_01.jpg"
+    },
+    {
+      "view": "details",
+      "view_label": "Détails dommages",
+      "filename": "DOS-20260915-111935-9B5786__details_01.jpg",
+      "path": "photos/DOS-20260915-111935-9B5786__details_01.jpg",
+      "source_dossier_id": "DOS-20260915-111935-9B5786",
+      "source_path": "photos/details_01.jpg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20260915-111935-9B5786__droite_01.jpg",
+      "path": "photos/DOS-20260915-111935-9B5786__droite_01.jpg",
+      "source_dossier_id": "DOS-20260915-111935-9B5786",
+      "source_path": "photos/droite_01.jpg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20260915-111935-9B5786__gauche_01.jpg",
+      "path": "photos/DOS-20260915-111935-9B5786__gauche_01.jpg",
+      "source_dossier_id": "DOS-20260915-111935-9B5786",
+      "source_path": "photos/gauche_01.jpg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20260921-135133-5F2CA6__arriere_01.jpg",
+      "path": "photos/DOS-20260921-135133-5F2CA6__arriere_01.jpg",
+      "source_dossier_id": "DOS-20260921-135133-5F2CA6",
+      "source_path": "photos/arriere_01.jpg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20260921-135133-5F2CA6__avant_01.jpg",
+      "path": "photos/DOS-20260921-135133-5F2CA6__avant_01.jpg",
+      "source_dossier_id": "DOS-20260921-135133-5F2CA6",
+      "source_path": "photos/avant_01.jpg"
+    },
+    {
+      "view": "details",
+      "view_label": "Détails dommages",
+      "filename": "DOS-20260921-135133-5F2CA6__details_01.jpg",
+      "path": "photos/DOS-20260921-135133-5F2CA6__details_01.jpg",
+      "source_dossier_id": "DOS-20260921-135133-5F2CA6",
+      "source_path": "photos/details_01.jpg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20260921-135133-5F2CA6__droite_01.jpg",
+      "path": "photos/DOS-20260921-135133-5F2CA6__droite_01.jpg",
+      "source_dossier_id": "DOS-20260921-135133-5F2CA6",
+      "source_path": "photos/droite_01.jpg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20260921-135133-5F2CA6__gauche_01.jpg",
+      "path": "photos/DOS-20260921-135133-5F2CA6__gauche_01.jpg",
+      "source_dossier_id": "DOS-20260921-135133-5F2CA6",
+      "source_path": "photos/gauche_01.jpg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20260921-140309-596141__arriere_01.jpg",
+      "path": "photos/DOS-20260921-140309-596141__arriere_01.jpg",
+      "source_dossier_id": "DOS-20260921-140309-596141",
+      "source_path": "photos/arriere_01.jpg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20260921-140309-596141__avant_01.jpg",
+      "path": "photos/DOS-20260921-140309-596141__avant_01.jpg",
+      "source_dossier_id": "DOS-20260921-140309-596141",
+      "source_path": "photos/avant_01.jpg"
+    },
+    {
+      "view": "details",
+      "view_label": "Détails dommages",
+      "filename": "DOS-20260921-140309-596141__details_01.jpg",
+      "path": "photos/DOS-20260921-140309-596141__details_01.jpg",
+      "source_dossier_id": "DOS-20260921-140309-596141",
+      "source_path": "photos/details_01.jpg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20260921-140309-596141__droite_01.jpg",
+      "path": "photos/DOS-20260921-140309-596141__droite_01.jpg",
+      "source_dossier_id": "DOS-20260921-140309-596141",
+      "source_path": "photos/droite_01.jpg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20260921-140309-596141__gauche_01.jpg",
+      "path": "photos/DOS-20260921-140309-596141__gauche_01.jpg",
+      "source_dossier_id": "DOS-20260921-140309-596141",
+      "source_path": "photos/gauche_01.jpg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20260922-141140-1D1E11__arriere_01.jpg",
+      "path": "photos/DOS-20260922-141140-1D1E11__arriere_01.jpg",
+      "source_dossier_id": "DOS-20260922-141140-1D1E11",
+      "source_path": "photos/arriere_01.jpg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20260922-141140-1D1E11__avant_01.jpg",
+      "path": "photos/DOS-20260922-141140-1D1E11__avant_01.jpg",
+      "source_dossier_id": "DOS-20260922-141140-1D1E11",
+      "source_path": "photos/avant_01.jpg"
+    },
+    {
+      "view": "details",
+      "view_label": "Détails dommages",
+      "filename": "DOS-20260922-141140-1D1E11__details_01.jpg",
+      "path": "photos/DOS-20260922-141140-1D1E11__details_01.jpg",
+      "source_dossier_id": "DOS-20260922-141140-1D1E11",
+      "source_path": "photos/details_01.jpg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20260922-141140-1D1E11__droite_01.jpg",
+      "path": "photos/DOS-20260922-141140-1D1E11__droite_01.jpg",
+      "source_dossier_id": "DOS-20260922-141140-1D1E11",
+      "source_path": "photos/droite_01.jpg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20260922-141140-1D1E11__gauche_01.jpg",
+      "path": "photos/DOS-20260922-141140-1D1E11__gauche_01.jpg",
+      "source_dossier_id": "DOS-20260922-141140-1D1E11",
+      "source_path": "photos/gauche_01.jpg"
+    },
+    {
+      "filename": "DOS-20260926-042055-31A121__arriere_01.jpg",
+      "path": "photos/DOS-20260926-042055-31A121__arriere_01.jpg",
+      "source_dossier_id": "DOS-20260926-042055-31A121",
+      "source_path": "photos/arriere_01.jpg"
+    },
+    {
+      "filename": "DOS-20260926-042055-31A121__avant_01.jpg",
+      "path": "photos/DOS-20260926-042055-31A121__avant_01.jpg",
+      "source_dossier_id": "DOS-20260926-042055-31A121",
+      "source_path": "photos/avant_01.jpg"
+    },
+    {
+      "filename": "DOS-20260926-042055-31A121__details_01.jpg",
+      "path": "photos/DOS-20260926-042055-31A121__details_01.jpg",
+      "source_dossier_id": "DOS-20260926-042055-31A121",
+      "source_path": "photos/details_01.jpg"
+    },
+    {
+      "filename": "DOS-20260926-042055-31A121__droite_01.jpg",
+      "path": "photos/DOS-20260926-042055-31A121__droite_01.jpg",
+      "source_dossier_id": "DOS-20260926-042055-31A121",
+      "source_path": "photos/droite_01.jpg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20260926-042943-45BFB9__arriere_01.jpg",
+      "path": "photos/DOS-20260926-042943-45BFB9__arriere_01.jpg",
+      "source_dossier_id": "DOS-20260926-042943-45BFB9",
+      "source_path": "photos/arriere_01.jpg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20260926-042943-45BFB9__avant_01.jpg",
+      "path": "photos/DOS-20260926-042943-45BFB9__avant_01.jpg",
+      "source_dossier_id": "DOS-20260926-042943-45BFB9",
+      "source_path": "photos/avant_01.jpg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20260926-042943-45BFB9__droite_01.jpg",
+      "path": "photos/DOS-20260926-042943-45BFB9__droite_01.jpg",
+      "source_dossier_id": "DOS-20260926-042943-45BFB9",
+      "source_path": "photos/droite_01.jpg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20260926-042943-45BFB9__gauche_01.jpg",
+      "path": "photos/DOS-20260926-042943-45BFB9__gauche_01.jpg",
+      "source_dossier_id": "DOS-20260926-042943-45BFB9",
+      "source_path": "photos/gauche_01.jpg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20260930-151626-4F3C06__arriere_01.jpg",
+      "path": "photos/DOS-20260930-151626-4F3C06__arriere_01.jpg",
+      "source_dossier_id": "DOS-20260930-151626-4F3C06",
+      "source_path": "photos/arriere_01.jpg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20260930-151626-4F3C06__avant_01.jpg",
+      "path": "photos/DOS-20260930-151626-4F3C06__avant_01.jpg",
+      "source_dossier_id": "DOS-20260930-151626-4F3C06",
+      "source_path": "photos/avant_01.jpg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20260930-151626-4F3C06__droite_01.jpg",
+      "path": "photos/DOS-20260930-151626-4F3C06__droite_01.jpg",
+      "source_dossier_id": "DOS-20260930-151626-4F3C06",
+      "source_path": "photos/droite_01.jpg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20260930-151626-4F3C06__gauche_01.jpg",
+      "path": "photos/DOS-20260930-151626-4F3C06__gauche_01.jpg",
+      "source_dossier_id": "DOS-20260930-151626-4F3C06",
+      "source_path": "photos/gauche_01.jpg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20261002-115436-87479A__arriere_01.jpeg",
+      "path": "photos/DOS-20261002-115436-87479A__arriere_01.jpeg",
+      "source_dossier_id": "DOS-20261002-115436-87479A",
+      "source_path": "photos/arriere_01.jpeg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20261002-115436-87479A__avant_01.jpeg",
+      "path": "photos/DOS-20261002-115436-87479A__avant_01.jpeg",
+      "source_dossier_id": "DOS-20261002-115436-87479A",
+      "source_path": "photos/avant_01.jpeg"
+    },
+    {
+      "view": "details",
+      "view_label": "Détails dommages",
+      "filename": "DOS-20261002-115436-87479A__details_01.jpeg",
+      "path": "photos/DOS-20261002-115436-87479A__details_01.jpeg",
+      "source_dossier_id": "DOS-20261002-115436-87479A",
+      "source_path": "photos/details_01.jpeg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20261002-115436-87479A__droite_01.jpeg",
+      "path": "photos/DOS-20261002-115436-87479A__droite_01.jpeg",
+      "source_dossier_id": "DOS-20261002-115436-87479A",
+      "source_path": "photos/droite_01.jpeg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20261002-115436-87479A__gauche_01.jpeg",
+      "path": "photos/DOS-20261002-115436-87479A__gauche_01.jpeg",
+      "source_dossier_id": "DOS-20261002-115436-87479A",
+      "source_path": "photos/gauche_01.jpeg"
+    },
+    {
+      "view": "arriere",
+      "view_label": "Vue arrière",
+      "filename": "DOS-20261003-105257-A6B805__arriere_01.jpeg",
+      "path": "photos/DOS-20261003-105257-A6B805__arriere_01.jpeg",
+      "source_dossier_id": "DOS-20261003-105257-A6B805",
+      "source_path": "photos/arriere_01.jpeg"
+    },
+    {
+      "view": "avant",
+      "view_label": "Vue avant",
+      "filename": "DOS-20261003-105257-A6B805__avant_01.jpeg",
+      "path": "photos/DOS-20261003-105257-A6B805__avant_01.jpeg",
+      "source_dossier_id": "DOS-20261003-105257-A6B805",
+      "source_path": "photos/avant_01.jpeg"
+    },
+    {
+      "view": "details",
+      "view_label": "Détails dommages",
+      "filename": "DOS-20261003-105257-A6B805__details_01.jpeg",
+      "path": "photos/DOS-20261003-105257-A6B805__details_01.jpeg",
+      "source_dossier_id": "DOS-20261003-105257-A6B805",
+      "source_path": "photos/details_01.jpeg"
+    },
+    {
+      "view": "droite",
+      "view_label": "Vue droite",
+      "filename": "DOS-20261003-105257-A6B805__droite_01.jpeg",
+      "path": "photos/DOS-20261003-105257-A6B805__droite_01.jpeg",
+      "source_dossier_id": "DOS-20261003-105257-A6B805",
+      "source_path": "photos/droite_01.jpeg"
+    },
+    {
+      "view": "gauche",
+      "view_label": "Vue gauche",
+      "filename": "DOS-20261003-105257-A6B805__gauche_01.jpeg",
+      "path": "photos/DOS-20261003-105257-A6B805__gauche_01.jpeg",
+      "source_dossier_id": "DOS-20261003-105257-A6B805",
+      "source_path": "photos/gauche_01.jpeg"
+    }
+  ],
+  "updated_at": "2026-11-02T12:51:56.328952+00:00"
+}
