@@ -1,0 +1,17 @@
+{
+  "type": "verification",
+  "marque_id": 10,
+  "model_id": 75,
+  "matricule": "12458-8-a",
+  "date_mise_en_circulation": "2000-11-12",
+  "marque": "Dacia",
+  "modele": "Sandero",
+  "dossier_id": "DOS-20261028-200009-ea8cef342ec64c46b18f2e6b25982a66",
+  "source": "cabek_ai",
+  "created_at": "2026-10-28T20:00:09.172234+00:00",
+  "updated_at": "2026-10-28T20:00:09.172234+00:00",
+  "annee": "2000",
+  "photos": [],
+  "photo_history": [],
+  "workflow_status": "before_incomplete"
+}
