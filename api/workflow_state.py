@@ -40,17 +40,28 @@ def workflow_status(dossier: "DossierRecord", scan_state: str) -> str:
     metadata = dossier.metadata
     if metadata.type == "forfait_expertise":
         return scan_state
+    captures = list(metadata.captures.values())
+    if any(capture.get("status") == "capturing" for capture in captures):
+        return "capturing"
+    if any(capture.get("status") == "failed" for capture in captures):
+        return "capture_failed"
     if metadata.type == "chiffrage_rapide":
         if scan_state in ("queued", "processing"):
+            from api.files import read_json_object
+            status = read_json_object(dossier.directory / "analysis/status.json", "invalid_status")
+            if status.get("progress", {}).get("stage") == "awaiting_metadata":
+                return "awaiting_metadata"
             return "analyzing"
         if scan_state == "completed":
             return "estimated"
         if scan_state == "failed":
             return "failed"
         if not vehicle_is_complete(metadata):
-            return "draft"
+            return "awaiting_metadata" if available_photo_records(dossier) else "draft"
         return "ready_to_scan" if available_photo_records(dossier) else "awaiting_photos"
     photos = available_photo_records(dossier)
+    if not photos:
+        return "draft" if not vehicle_is_complete(metadata) else "before_incomplete"
     before = {photo.side for photo in photos if photo.phase == "before"}
     after = {photo.side for photo in photos if photo.phase == "after"}
     if before != set(SIDES):

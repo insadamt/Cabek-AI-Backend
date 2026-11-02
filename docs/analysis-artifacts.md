@@ -30,8 +30,9 @@ The existing repository's Windows-style photo paths are supported.
 Vehicle identity uses optional positive integer `marque_id` and `model_id`,
 provided together. IDs take precedence over names: the vehicle-selection API
 validates their relationship against AutoEstimate and saves canonical `marque`
-and `modele` labels. Scan admission repeats validation for ID-based dossiers
-before taking the input snapshot. Saved labels keep reads available offline;
+and `modele` labels. Expertise scan admission repeats validation for ID-based
+dossiers before taking the input snapshot; quick jobs defer this until pricing.
+Saved labels keep reads available offline;
 legacy name-only dossiers remain supported. Do not guess IDs from vehicle names.
 ID-only metadata is readable with empty labels; legacy null names are read as
 empty strings without rewriting the file. Use `model_id`, not `modele_id`.
@@ -42,7 +43,8 @@ artifact by writing a temporary sibling file, closing it, then renaming it.
 The final filenames must never refer to partially written artifacts.
 The runner writes directly into `analysis/`: annotations after each photo, then
 `report.pdf`, then `result.json` last. The supervisor validates worker exit,
-output files, and input fingerprints before setting `status: completed`.
+output files, and input fingerprints before setting `status: completed`. Quick jobs also validate
+the frozen pricing vehicle snapshot.
 Managed results remain unavailable while their worker is active or failed.
 
 Retry admission first locks the dossier and confirms no worker is still writing.
@@ -149,3 +151,25 @@ annotation files. These are held in a bounded memory cache, never saved alongsid
 runner artifacts, and do not affect output validation or scan completion.
 Saved paths and version 1 annotations remain JPEG/PNG as specified above.
 See [api.md](api.md) for preview URLs, image dimensions, quality, and HTTP caching.
+
+## Quick inference before vehicle entry
+
+Managed quick jobs set `allow_metadata_updates` in the private worker request.
+The engine’s `marque` argument is unused by detection; initial damage costs use
+the existing vehicle-independent barèmes. The runner therefore generates real
+annotations and saves private `.detections.json` before waiting for metadata.
+`.pipeline.json` supplies `awaiting_metadata` only after actual annotations exist.
+No PDF or final result is published while required vehicle values are missing.
+
+The worker reads current metadata under `.metadata.lock`, validates the selected
+IDs through AutoEstimate, refreshes canonical labels, and atomically publishes
+`.vehicle.json` with the run ID. This freezes the vehicle against API edits before
+pricing begins. The report and final result use that snapshot. Quick fingerprints
+exclude only vehicle fields, workflow status, capture bookkeeping, and modification
+time; photos, photo manifest, feedback, and other metadata remain protected.
+Supervisor and restart recovery separately compare the frozen vehicle to disk.
+Legacy expertise keeps the original whole-metadata fingerprint and scan locks.
+
+These stage/snapshot/checkpoint files are private and are cleaned on failed retry.
+A wait occupies the existing single worker and counts toward scan timeout.
+Restart/timeout failure preserves originals; retry reruns real inference safely.

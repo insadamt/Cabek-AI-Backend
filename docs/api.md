@@ -4,7 +4,9 @@ Read dossiers, create quick-estimation/verification dossiers, upload photographs
 start real analyses, and retrieve saved results, images, and PDFs. This contract
 depends on the existing file repository, AutoEstimate, and asynchronous scan worker.
 The complete creation, editing, comparison, and filtering contract is in
-[dossier-workflows-api.md](dossier-workflows-api.md).
+[dossier-workflows-api.md](dossier-workflows-api.md). Persistent draft creation,
+mock tunnel capture, and the frontend curl flow are in
+[tunnel-capture-api.md](tunnel-capture-api.md).
 
 ## Run locally
 
@@ -43,6 +45,9 @@ is not needed in Postman or frontend requests.
 | `CABEK_MODELS_DIR` | Directory containing the three existing `.pt` models | Repository `models` |
 | `CABEK_SCAN_TIMEOUT_SECONDS` | Maximum execution time per scan | `1800` |
 | `CABEK_SCAN_MAX_PENDING` | Maximum accepted scans, including the running scan | `8` |
+| `CABEK_TUNNEL_MODE` | `disabled` or `mock` | `disabled` |
+| `CABEK_MOCK_PHOTOS_DIR` | Local JPEG/PNG sample directory | Unset |
+| `CABEK_MOCK_PHOTO_DELAY_SECONDS` | Camera delivery delay per saved photo | `0` |
 | `AUTOESTIMATE_BASE_URL` | Pricing API base URL, including `/api/v1` | Unset |
 | `AUTOESTIMATE_TOKEN` | Pricing bearer token | Unset |
 
@@ -72,8 +77,9 @@ The backend verifies the brand exists and the model belongs to it, then atomical
 saves the IDs and canonical names, preserving photos and other metadata. Returns
 `200` with `{"marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero"}`.
 Names cannot be supplied in this request. Invalid IDs or relationships return
-`422`; unknown dossier `404`; active or completed scans `409`; unavailable
+`422`; unknown dossier `404`; protected scans/completed dossiers `409`; unavailable
 AutoEstimate or storage `503`. Failed validation leaves metadata unchanged.
+Quick vehicle metadata can change during inference; pricing freezes it afterwards.
 
 Saved vehicle metadata looks like the example below. The full file contract and
 legacy compatibility rules are documented in [metadata.md](metadata.md).
@@ -93,9 +99,10 @@ legacy compatibility rules are documented in [metadata.md](metadata.md).
 ```
 
 IDs must be supplied together. Existing dossiers with names only remain supported
-without automatic migration. When IDs are present, scan admission revalidates
-them and refreshes saved names before capturing inputs; AutoEstimate must be
-reachable. Dashboard/result reads use saved names without network calls. New
+without automatic migration. Expertise scan admission revalidates present IDs
+and refreshes saved names; AutoEstimate must be reachable. Quick image inference
+starts independently and revalidates IDs only before pricing. Dashboard/result
+reads use saved names without network calls. New
 analysis vehicle objects include both IDs; legacy results may return null IDs.
 Legacy null `marque` and `modele` metadata values are read as empty names without
 rewriting the file. Numeric IDs belong in `marque_id` and `model_id`, not name
@@ -193,7 +200,8 @@ files and scan dependencies must be available.
 Poll `GET /api/dossiers/{dossier_id}/result` every 1–2 seconds until `completed`
 or `failed`. Counts come from valid generated files, not a timer. Each photo
 requires parts, damage, and critical-zone annotations: five photos mean fifteen
-files. Stages are `queued`, `preparing`, `analyzing_photos`, `finalizing`, then
+files. Stages are `queued`, `preparing`, `analyzing_photos`, `awaiting_metadata`
+(quick jobs only), `finalizing`, then
 `completed` or `failed`. ETA stays `null` while no reliable estimate is available.
 
 Failed scans can retry with the same POST. All outputs use the same `analysis/`
@@ -211,7 +219,9 @@ mid-photo.
 `422` invalid inputs; `503 worker_unavailable` for missing dependencies/models,
 a full queue, or a stopped worker. Stored failure codes include `scan_failed`,
 `scan_timeout`, `scan_interrupted`, and `scan_inputs_changed`.
-Quick-estimation dossiers require complete vehicle metadata and can scan one side.
+Quick-estimation dossiers can scan one side without vehicle metadata. They wait
+after real inference for complete valid metadata before pricing. This wait counts
+toward the configured scan timeout and occupies the single prototype worker.
 Verification dossiers always reject scans with `409 scan_disabled_for_type`.
 
 ## GET `/api/dossiers/{dossier_id}/result`

@@ -29,7 +29,7 @@ def test_failed_create_leaves_no_partial_folder(client, storage, workflow_catalo
     monkeypatch.setattr("api.workflow_service.publish_json", fail)
     response = client.post("/api/dossiers", json={
         "type": "verification", "marque_id": 12, "model_id": 34,
-        "matricule": "TEST", "date_mise_en_circulation": "2020-01-01",
+        "matricule": "14554-B-4578", "date_mise_en_circulation": "2020-01-01",
     })
     assert response.status_code == 503
     assert list(storage.iterdir()) == []
@@ -54,22 +54,20 @@ def test_failed_metadata_commit_preserves_previous_photo_and_manifest(
     assert path.read_bytes() == before
     assert list((directory / "photos").iterdir()) == originals
     assert client.get(photo["original_url"]).status_code == 200
-    assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "CHANGE"}).status_code == 503
+    assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "14554-C-4578"}).status_code == 503
     assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize("lock_name", [".scan.lock", ".worker.lock"])
 @pytest.mark.parametrize("category", ["chiffrage_rapide", "verification"])
-def test_all_input_writes_share_scan_locks(client, storage, new_dossier, upload_photo, category, lock_name):
+def test_photo_locks_allow_independent_vehicle_updates(client, storage, new_dossier, upload_photo, category, lock_name):
     dossier_id = new_dossier(category)["dossier_id"]
     directory = storage / dossier_id
     (directory / "analysis").mkdir()
-    before = (directory / "metadata.json").read_bytes()
     with FileLock(str(directory / "analysis" / lock_name)):
         assert upload_photo(dossier_id, phase="before" if category == "verification" else None).status_code == 409
-        assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "CHANGE"}).status_code == 409
-        assert client.put(f"/api/dossiers/{dossier_id}/vehicle", json={"marque_id": 12, "model_id": 34}).status_code == 409
-    assert (directory / "metadata.json").read_bytes() == before
+        assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "14554-C-4578"}).status_code == 200
+        assert client.put(f"/api/dossiers/{dossier_id}/vehicle", json={"marque_id": 12, "model_id": 34}).status_code == 200
 
 
 def test_network_failure_during_patch_preserves_inputs(client, storage, new_dossier, monkeypatch):
@@ -135,7 +133,7 @@ def test_finalized_evidence_stays_locked_after_external_file_loss(client, storag
     assert upload_photo(dossier_id, "right", "after", photo_id=photo["photo_id"]).status_code == 409
 
 
-def test_registration_date_required_before_quick_scan(storage, new_dossier, upload_photo, workflow_catalog):
+def test_missing_registration_waits_after_quick_inference(storage, new_dossier, upload_photo, workflow_catalog):
     dossier_id = new_dossier()["dossier_id"]
     upload_photo(dossier_id)
     path = storage / dossier_id / "metadata.json"
@@ -143,10 +141,11 @@ def test_registration_date_required_before_quick_scan(storage, new_dossier, uplo
     metadata.pop("date_mise_en_circulation")
     path.write_text(json.dumps(metadata))
     with TestClient(create_app(ApiSettings(storage), FixtureBackend())) as client:
-        assert client.get(f"/api/dossiers/{dossier_id}").json()["workflow_status"] == "draft"
+        assert client.get(f"/api/dossiers/{dossier_id}").json()["workflow_status"] == "awaiting_metadata"
         response = client.post(f"/api/dossiers/{dossier_id}/scan")
-        assert response.status_code == 422
-        assert response.json()["error"]["code"] == "incomplete_vehicle_metadata"
+        assert response.status_code == 202
+        assert client.patch(f"/api/dossiers/{dossier_id}/metadata", json={"date_mise_en_circulation": "2020-05-17"}).status_code == 200
+        assert wait_for_terminal(client, dossier_id)[0]["status"] == "completed"
 
 
 @pytest.mark.parametrize("over_limit", [False, True])

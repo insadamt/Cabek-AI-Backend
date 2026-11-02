@@ -1,3 +1,8 @@
+"""Measure scan readiness from actual saved annotations, reports, and stage markers.
+
+Depends on artifact validators; no time-based percentage or ETA is fabricated.
+"""
+
 from pathlib import Path
 import time
 
@@ -44,6 +49,12 @@ def inspect_progress(
         stage = "finalizing" if completed_photos == len(photos) else "analyzing_photos"
     if report_ready and started_at is not None:
         stage = "finalizing"
+    pipeline_path = output_dir / ".pipeline.json"
+    if completed_photos == len(photos) and pipeline_path.is_file() and not report_ready:
+        from api.files import read_json_object
+        marker = read_json_object(pipeline_path, "invalid_status")
+        if marker.get("stage") == "awaiting_metadata":
+            stage = "awaiting_metadata"
     result_ready = False
     result_path = output_dir / "result.json"
     if result_path.is_file() and report_ready and ready == 3 * len(photos):

@@ -5,6 +5,9 @@ AutoEstimate et le stockage de dossiers sur fichiers. L'API conserve l'expertise
 existante et ajoute le chiffrage rapide et les comparaisons photo avant/après.
 Le contrat frontend est décrit dans [docs/dossier-workflows-api.md](docs/dossier-workflows-api.md).
 
+Le tunnel local simulé importe de vraies photos et déclenche les modèles existants.
+Configuration et parcours complet : [docs/tunnel-capture-api.md](docs/tunnel-capture-api.md).
+
 ## API FastAPI
 
 Les endpoints de lecture des dossiers, résultats enregistrés, images et PDF sont

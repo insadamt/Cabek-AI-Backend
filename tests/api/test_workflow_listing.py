@@ -11,9 +11,9 @@ import pytest
 
 def test_filter_sort_totals_and_category_counters(client, storage, create_dossier, new_dossier, upload_photo):
     create_dossier("LEGACY")
-    quick_one = new_dossier(matricule="MATCH-1")["dossier_id"]
-    quick_two = new_dossier(matricule="MATCH-2")["dossier_id"]
-    verification = new_dossier("verification", matricule="MATCH-3")["dossier_id"]
+    quick_one = new_dossier(matricule="14554-A-1")["dossier_id"]
+    quick_two = new_dossier(matricule="14554-A-2")["dossier_id"]
+    verification = new_dossier("verification", matricule="14554-A-3")["dossier_id"]
     upload_photo(quick_two, "rear")
     for dossier_id, created in [(quick_one, "2026-01-01T10:00:00Z"),
                                 (quick_two, "2026-02-01T10:00:00Z"),
@@ -22,7 +22,7 @@ def test_filter_sort_totals_and_category_counters(client, storage, create_dossie
         metadata = json.loads(path.read_text())
         metadata.update(created_at=created, updated_at=created)
         path.write_text(json.dumps(metadata))
-    query = {"search": "match", "type": "chiffrage_rapide", "sort": "created_at_asc", "limit": 1}
+    query = {"search": "14554", "type": "chiffrage_rapide", "sort": "created_at_asc", "limit": 1}
     result = client.get("/api/dossiers", params=query).json()
     assert result["total"] == result["counts"]["all"] == 2
     assert result["type_counts"] == {"forfait_expertise": 0, "chiffrage_rapide": 2, "verification": 1}

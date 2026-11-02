@@ -1,3 +1,9 @@
+"""Publish complete artifacts and fingerprint immutable scan inputs.
+
+Depends on confined dossier storage and image/PDF validators. Quick jobs exclude
+editable vehicle fields; the pricing gate validates their separate frozen snapshot.
+"""
+
 import hashlib
 import json
 import os
@@ -56,6 +62,15 @@ def input_signatures(dossier: DossierRecord) -> dict[str, str]:
     signatures = {}
     for relative_path in paths:
         path = confined_path(dossier.directory, relative_path)
+        if relative_path == "metadata.json" and dossier.metadata.type == "chiffrage_rapide":
+            from api.files import read_json_object
+            from scans.metadata_gate import VEHICLE_FIELDS, MUTABLE_WORKFLOW_FIELDS
+
+            metadata = read_json_object(path, "invalid_metadata")
+            frozen = {key: value for key, value in metadata.items()
+                      if key not in VEHICLE_FIELDS | MUTABLE_WORKFLOW_FIELDS}
+            signatures[relative_path] = hashlib.sha256(json.dumps(frozen, sort_keys=True).encode()).hexdigest()
+            continue
         with path.open("rb") as stream:
             signatures[relative_path] = hashlib.file_digest(stream, "sha256").hexdigest()
     return signatures

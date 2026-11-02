@@ -1,3 +1,8 @@
+"""Load local API, worker, and mock tunnel settings from the environment.
+
+Depends on dotenv and pathlib; camera delivery delay never controls AI execution.
+"""
+
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -19,6 +24,9 @@ class ApiSettings:
     models_dir: Path = Path(__file__).resolve().parents[1] / "models"
     scan_timeout_seconds: float = 1800
     scan_max_pending: int = 8
+    tunnel_mode: str = "disabled"
+    mock_photos_dir: Path | None = None
+    mock_photo_delay_seconds: float = 0
 
     @classmethod
     def from_environment(cls) -> "ApiSettings":
@@ -35,6 +43,9 @@ class ApiSettings:
             models_dir=Path(os.environ.get("CABEK_MODELS_DIR", default_root.parents[1] / "models")),
             scan_timeout_seconds=float(os.environ.get("CABEK_SCAN_TIMEOUT_SECONDS", "1800")),
             scan_max_pending=int(os.environ.get("CABEK_SCAN_MAX_PENDING", "8")),
+            tunnel_mode=os.environ.get("CABEK_TUNNEL_MODE", "disabled"),
+            mock_photos_dir=Path(os.environ["CABEK_MOCK_PHOTOS_DIR"]) if os.environ.get("CABEK_MOCK_PHOTOS_DIR") else None,
+            mock_photo_delay_seconds=float(os.environ.get("CABEK_MOCK_PHOTO_DELAY_SECONDS", "0")),
             cors_origins=tuple(
                 origin.strip()
                 for origin in os.environ.get("CABEK_CORS_ORIGINS", "").split(",")

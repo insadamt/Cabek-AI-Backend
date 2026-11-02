@@ -1,7 +1,7 @@
 """Expose local dossier creation, permitted metadata edits, and side/phase uploads.
 
-Depends on workflow/photo services and existing dossier response assembly. Uploads
-store evidence only; starting inference remains an explicit separate scan request.
+Depends on workflow/photo services and existing dossier response assembly. Manual
+uploads keep explicit scan admission; tunnel capture has its own automatic handoff.
 """
 
 from typing import Annotated
@@ -42,11 +42,12 @@ class PhotoCollection(BaseModel):
 @router.post("", status_code=201, response_model=DossierResult)
 def create_dossier(payload: CreateDossier, request: Request, workflows: WorkflowDependency,
                    service: ServiceDependency) -> DossierResult:
-    dossier_id = workflows.create_dossier(payload)
+    dossier_id = workflows.create_dossier(payload, request.headers.get("Idempotency-Key"))
     return service.read_result(dossier_id, request.scope.get("root_path", ""))
 
 
 @router.patch("/{dossier_id}", response_model=DossierResult)
+@router.patch("/{dossier_id}/metadata", response_model=DossierResult)
 def patch_dossier(dossier_id: DossierId, payload: PatchDossier, request: Request,
                   workflows: WorkflowDependency, service: ServiceDependency) -> DossierResult:
     workflows.patch_dossier(dossier_id, payload)

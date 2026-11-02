@@ -1,3 +1,9 @@
+"""Expose AutoEstimate vehicle options and validated dossier vehicle selection.
+
+Depends on the catalog and vehicle service; local quick edits honor the pricing
+snapshot, while external expertise keeps its original scan locks.
+"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, Request
@@ -32,7 +38,8 @@ def list_models(request: Request, marque_id: Annotated[int, Query(gt=0)]):
 @router.put("/api/dossiers/{dossier_id}/vehicle", response_model=ResolvedVehicle,
             summary="Save validated vehicle IDs and resolved names",
             description="Requires an existing uncompleted dossier and JSON marque_id/model_id. Validates the relationship "
-                        "against AutoEstimate and saves canonical names while preserving other metadata. Rejects active scans.",
+                        "against AutoEstimate and saves canonical names while preserving other metadata. Quick vehicle "
+                        "edits remain available until pricing; expertise active scans and finalized dossiers reject edits.",
             responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}})
 def update_vehicle(request: Request, dossier_id: Annotated[str, Path()], selection: VehicleSelection):
     service = VehicleSelectionService(request.app.state.scan_manager, request.app.state.vehicle_catalog)

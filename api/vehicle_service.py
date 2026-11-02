@@ -1,7 +1,7 @@
 """Resolve canonical vehicle selections and preserve existing scan input locks.
 
-Depends on AutoEstimate and atomic publishers; locally created categories also
-follow workflow edit rules so the legacy vehicle route cannot bypass finalization.
+Depends on AutoEstimate and atomic publishers; locally created categories follow
+the workflow pricing gate so the legacy vehicle route cannot bypass finalization.
 """
 
 from datetime import datetime, timezone

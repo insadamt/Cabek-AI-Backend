@@ -21,7 +21,6 @@ from api.repository import DossierRecord, DossierRepository
 from api.schemas import DossierResult, ScanProgress
 from api.vehicle_catalog import VehicleCatalog, VehicleSelection
 from api.vehicle_service import save_vehicle_selection
-from api.workflow_state import vehicle_is_complete
 from scans.artifacts import input_signatures, publish_json, validate_outputs
 from scans.backend import ModelProcessBackend, ScanBackend
 from scans.cleanup import remove_incomplete_outputs
@@ -75,7 +74,11 @@ class ScanManager:
         reserved = False
         try:
             dossier_lock.acquire(timeout=0)
-            with self.lifecycle_lock:
+            with (
+                FileLock(str(dossier.directory / ".capture.lock"), timeout=0),
+                FileLock(str(dossier.directory / ".metadata.lock"), timeout=5),
+                self.lifecycle_lock,
+            ):
                 if not self.available:
                     raise DossierError(503, "worker_unavailable", "The scan worker is unavailable.")
 
@@ -86,8 +89,8 @@ class ScanManager:
                     self.reject_disabled_scan(dossier)
                     self.reject_completed_scan(dossier, analysis_dir)
                     self.reject_external_scan(analysis_dir)
-                    if dossier.metadata.type == "chiffrage_rapide" and not vehicle_is_complete(dossier.metadata):
-                        raise DossierError(422, "incomplete_vehicle_metadata", "Complete the vehicle metadata before scanning.")
+                    if any(capture.get("status") != "completed" for capture in dossier.metadata.captures.values()):
+                        raise DossierError(409, "capture_incomplete", "Complete photograph capture before scanning.")
                     if not dossier.photos:
                         raise DossierError(422, "no_valid_photos", "The dossier has no valid photos.")
                     for photo in dossier.photos.values():
@@ -96,9 +99,9 @@ class ScanManager:
                     reserved = self.capacity.acquire(blocking=False)
                     if not reserved:
                         raise DossierError(503, "worker_unavailable", "The scan queue is full.")
-                    if dossier.metadata.marque_id is not None:
+                    if dossier.metadata.marque_id is not None and dossier.metadata.type != "chiffrage_rapide":
 
-                        # Resolve manually supplied IDs before snapshotting inputs; names never override IDs.
+                        # Expertise preserves admission validation; quick detection defers it to pricing.
 
                         save_vehicle_selection(dossier.directory, VehicleSelection(
                             marque_id=dossier.metadata.marque_id, model_id=dossier.metadata.model_id,
@@ -201,6 +204,7 @@ class ScanManager:
             metadata=read_json_object(dossier.directory / "metadata.json", "invalid_metadata"),
             photos=list(dossier.photos.values()), feedback=feedback,
             input_signatures=input_signatures(dossier),
+            allow_metadata_updates=dossier.metadata.type == "chiffrage_rapide",
         )
         return ScanJob(dossier, request, dossier_lock)
 
@@ -246,6 +250,8 @@ class ScanManager:
                                 request = ScanRequest.model_validate_json(request_path.read_bytes())
                                 if input_signatures(dossier) != request.input_signatures:
                                     raise ValueError("Inputs changed during the interrupted scan.")
+                                from scans.metadata_gate import validate_pricing_snapshot
+                                validate_pricing_snapshot(request, dossier)
                         except (DossierError, OSError, ValueError):
                             (analysis_dir / "result.json").unlink(missing_ok=True)
                             self.save_recovered_status(dossier, record, "failed")

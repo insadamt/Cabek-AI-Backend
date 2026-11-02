@@ -1,3 +1,8 @@
+"""Remove only generated output after failed scan admission has been locked.
+
+Depends on the caller holding scan/worker locks; originals and manual files remain.
+"""
+
 from pathlib import Path
 
 
@@ -16,7 +21,7 @@ def remove_incomplete_outputs(analysis_dir: Path) -> None:
     # The caller holds both locks and has ruled out a completed analysis before deletion.
 
     generated = {"result.json", "report.pdf", "result.json.tmp", "report.pdf.tmp",
-                 ".request.json", ".worker.log"}
+                 ".request.json", ".worker.log", ".pipeline.json", ".vehicle.json", ".detections.json"}
     for path in analysis_dir.iterdir():
         if path.name in generated or (path.name.startswith(".scan-") and path.name.endswith(".tmp")):
             if path.is_file() or path.is_symlink():

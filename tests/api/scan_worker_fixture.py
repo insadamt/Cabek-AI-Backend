@@ -1,4 +1,8 @@
-"""Subprocess fixture for exercising real job supervision without running YOLO."""
+"""Exercise process supervision and metadata gating with deterministic test outputs.
+
+Depends on real locks, image files, PDF files, and the production metadata gate;
+only detections and the upstream catalog are replaced within this test worker.
+"""
 
 import json
 from pathlib import Path
@@ -10,6 +14,7 @@ from pypdf import PdfWriter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scans.worker import run_accepted_scan
+from scans.metadata_gate import await_pricing_metadata
 
 
 def create_outputs(scan_request):
@@ -30,6 +35,12 @@ def create_outputs(scan_request):
             Image.new("RGB", (16, 12), "blue").save(temporary, format="PNG")
             temporary.replace(path)
             time.sleep(0.2)
+    from api.vehicle_catalog import VehicleCatalog, ResolvedVehicle
+    VehicleCatalog.resolve = lambda self, selection: ResolvedVehicle(
+        marque_id=selection.marque_id, model_id=selection.model_id, marque="Dacia", modele="Sandero",
+    )
+    await_pricing_metadata(scan_request)
+    request = scan_request.model_dump(mode="json")
     report = PdfWriter()
     report.add_blank_page(width=100, height=100)
     report.write(output / "report.pdf")

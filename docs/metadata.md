@@ -38,7 +38,7 @@ endpoints described in [api.md](api.md#vehicle-selection).
 | `type` | `forfait_expertise` (default for legacy), `chiffrage_rapide`, or `verification`; independent of scan state |
 | `source` | `external` when absent; locally created dossiers save `cabek_ai` |
 | `updated_at` | UTC modification timestamp for local API writes |
-| `date_mise_en_circulation` | Complete valid ISO `YYYY-MM-DD`; required on local creation, optional for legacy |
+| `date_mise_en_circulation` | Complete valid ISO `YYYY-MM-DD`; optional at creation; required for quick pricing |
 | `workflow_status` | Write-time snapshot; reads derive current category progress from saved inputs/scan artifacts |
 | `photo_history` | Replaced photo records with `replaced_at` and `replaced_by`; archived bytes are retained |
 | `photos` | Array of objects containing a string `path`; defaults to an empty array when omitted |
@@ -49,8 +49,8 @@ with forward slashes; existing Windows-style separators remain supported.
 Every declared original must exist and pass image validation before a scan.
 An empty photo array can be read but cannot be scanned.
 Verification originals live under `photos/before/` or `photos/after/` and carry
-explicit `side`, `phase`, `photo_id`, and `uploaded_at`. Four sides are required
-per verification phase; one side is sufficient for quick estimation. Verification
+explicit `side`, `phase`, `photo_id`, and `uploaded_at`. Four distinct sides are required
+per verification phase; tunnel capture supports multiple photographs per side; one side is sufficient for quick estimation. Verification
 never scans. `before_finalized_at` locks before evidence when after collection
 starts; `evidence_finalized_at` locks the complete comparison, even after file loss.
 
@@ -67,7 +67,8 @@ numeric string ID, or a numeric name value is invalid metadata.
 
 When IDs exist, they take precedence over labels. Vehicle selection validates
 the brand/model relationship against AutoEstimate and saves canonical labels.
-Scan admission repeats this validation before capturing its input snapshot.
+Expertise scan admission repeats this validation before capturing its input
+snapshot; quick jobs defer validation until after inference, before pricing.
 ID-only records are readable with empty names; reads neither resolve names over
 the network nor rewrite the file.
 
@@ -84,3 +85,18 @@ reflects current metadata; completed `result.vehicle` retains the analysis
 snapshot. Metadata has no `schema_version` field requirement; the saved analysis
 envelope separately uses `schema_version: 1` as described in
 [analysis-artifacts.md](analysis-artifacts.md).
+
+## Persistent draft and capture fields
+
+Type-only local creation saves `workflow_status: "draft"`, empty names/plate, null
+vehicle IDs/date, UTC timestamps, and an empty `photos` array. Optional
+`creation_key` (SHA-256 digest) and `creation_request` deduplicate creation retries.
+`captures` is keyed by `single`, `before`, or `after`; each record saves capture
+identity, phase, status, planned source paths/sides, timestamps, and safe error codes.
+Captured photo records add `capture_id`, `original_filename`, and a confined relative
+`source`; source paths are private. API photo URLs always reference dossier copies.
+
+New plate writes validate 1–6 ASCII digits, one Latin/Arabic letter, then 1–6 ASCII
+digits, separated by hyphens. Latin letters are uppercased; Arabic stays intact.
+Reads never retroactively validate or rewrite historical plate strings.
+See [tunnel-capture-api.md](tunnel-capture-api.md) for lifecycle and recovery.

@@ -58,7 +58,7 @@ def test_four_before_and_after_sides_without_analysis(client, storage, new_dossi
         assert photo["path"].startswith(f"photos/{photo['phase']}/")
     photo = result["photos"][-1]
     assert upload_photo(dossier_id, photo["side"], photo["phase"], photo_id=photo["photo_id"]).status_code == 409
-    assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "CHANGE"}).status_code == 409
+    assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "14554-C-4578"}).status_code == 409
     assert client.put(f"/api/dossiers/{dossier_id}/vehicle", json={"marque_id": 12, "model_id": 34}).status_code == 409
 
 

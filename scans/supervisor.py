@@ -1,3 +1,9 @@
+"""Supervise real workers, persist artifact progress, and validate completion.
+
+Depends on backend processes, input fingerprints, and the optional pricing gate;
+failures keep original photographs and retain the existing safe retry behavior.
+"""
+
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -87,6 +93,8 @@ def execute_job(
         if input_signatures(current) != job.request.input_signatures:
             failure_code = "scan_inputs_changed"
             raise ValueError("Dossier inputs changed while scanning.")
+        from scans.metadata_gate import validate_pricing_snapshot
+        validate_pricing_snapshot(job.request, current)
         validate_outputs(job.request.output_dir, current)
 
         # Files are already in analysis/; only a verified successful worker establishes completion.

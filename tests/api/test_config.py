@@ -1,3 +1,8 @@
+"""Check environment configuration and worker inheritance without exposing secrets.
+
+Depends on temporary dotenv files; deployment values take precedence over local settings.
+"""
+
 import os
 import subprocess
 import sys
@@ -42,3 +47,13 @@ def test_deployment_environment_overrides_local_file(tmp_path, monkeypatch):
     ApiSettings.from_environment()
 
     assert os.environ["AUTOESTIMATE_TOKEN"] == "deployment-test-token"
+
+
+def test_mock_tunnel_environment(monkeypatch, tmp_path):
+    monkeypatch.setenv("CABEK_TUNNEL_MODE", "mock")
+    monkeypatch.setenv("CABEK_MOCK_PHOTOS_DIR", str(tmp_path))
+    monkeypatch.setenv("CABEK_MOCK_PHOTO_DELAY_SECONDS", "0.25")
+    settings = ApiSettings.from_environment()
+    assert settings.tunnel_mode == "mock"
+    assert settings.mock_photos_dir == tmp_path
+    assert settings.mock_photo_delay_seconds == 0.25

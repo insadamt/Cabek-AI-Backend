@@ -6,6 +6,9 @@ It depends on the existing FastAPI file repository, AutoEstimate vehicle catalog
 and asynchronous expertise pipeline. Read it alongside [api.md](api.md),
 [metadata.md](metadata.md), and [analysis-artifacts.md](analysis-artifacts.md).
 
+The persistent draft and simulated tunnel contract, configuration, retry rules,
+and complete curl flow are in [tunnel-capture-api.md](tunnel-capture-api.md).
+
 ## Categories and ownership
 
 | Stable `type` | Origin | Manual creation | AI scan |
@@ -22,7 +25,8 @@ with its existing canonical selection and scan locks. For new categories that
 PUT follows the same edit/finalization rules as PATCH.
 
 Verification never creates AI results, financial estimates, reports, approvals,
-or certifications. Uploading any category's photo does not start a scan.
+or certifications. Manual uploads do not start a scan. Completed quick tunnel
+capture automatically submits the existing real scan worker.
 
 ## Vehicle reference and required inputs
 
@@ -37,17 +41,21 @@ Use `GET /api/vehicles/marques` and
 [{"id": 34, "marque_id": 12, "libelle": "Sandero"}]
 ```
 
-IDs here are illustrative. Use actual catalog IDs. New dossiers require positive
-JSON integer `marque_id` and `model_id`, nonblank `matricule` (maximum 100
-characters), and `date_mise_en_circulation` as a complete valid `YYYY-MM-DD`
-string. Years, timestamps, compact dates, nulls, and impossible dates are rejected.
+IDs here are illustrative. Use actual catalog IDs. Creation requires only `type`;
+omit unknown vehicle fields. When provided, `marque_id` and `model_id` must be a
+pair of positive JSON integers, `matricule` must be a Moroccan three-segment plate
+(e.g. `14554-B-4578` or `84654-ب-454`), and `date_mise_en_circulation` must be a
+complete valid `YYYY-MM-DD` string. Lowercase Latin plate letters become uppercase;
+Arabic is preserved. Nulls, years, timestamps, compact dates, and impossible dates
+are rejected on new date writes. Historical plates remain readable unchanged.
 The backend verifies brand existence and model membership and saves canonical
 `marque`/`modele` names; callers cannot supply these names.
 
 Missing configuration, network failure, non-200 reference responses, malformed
 catalog data, and inconsistent model brands return `503 autoestimate_unavailable`.
 No dossier is created or changed on failed reference validation. Reads use saved
-labels and work offline. IDs are revalidated at scan admission, as before.
+labels and work offline. Expertise IDs are revalidated at scan admission; quick
+jobs validate the final selection after inference, before pricing.
 The AutoEstimate token remains on the backend.
 
 Both existing pricing clients use `GET /estimation` with `marque_id`, `model_id`,
@@ -87,8 +95,9 @@ Each active new photo record includes:
 ```
 
 Quick-estimation phases are null. Side/phase identity is explicit in metadata.
-Verification allows one current photograph per phase/side. Quick estimates allow
-several photos on the same side. Generated IDs avoid original filename collisions.
+Manual verification uploads retain one-slot admission and explicit replacement.
+Tunnel capture supports multiple photographs per side in either category. Comparison
+slots contain one representative photo per side; `photos` contains all evidence. Generated IDs avoid original filename collisions.
 Published metadata and individual photos use temporary sibling files, fsync, and
 atomic rename. New dossiers become visible only after a hidden staging directory
 is fully initialized. Images are published before the manifest points at them;
@@ -99,7 +108,8 @@ staging folder; neither becomes readable through API media/list responses.
 Verification writes use the same admission/worker locks as other edits; an
 `analysis/` directory containing locks alone is not an analysis. Before evidence
 locks when the first after photo is saved (`before_finalized_at`); all evidence
-and metadata edits lock when all eight valid photos exist (`evidence_finalized_at`).
+and metadata edits lock when both phases have all required sides and capture has
+completed (`evidence_finalized_at`). Manual uploads still finalize at four per phase.
 These durable markers remain effective if a file is later lost or corrupted.
 There is no API unlock/delete/finalization override in this version.
 
@@ -113,7 +123,9 @@ snapshot; clients must use API state during/after asynchronous scanning.
 | Category | `workflow_status` | Meaning |
 | --- | --- | --- |
 | Expertise | Existing scan state | `not_analyzed`, `queued`, `processing`, `completed`, `failed` |
-| Quick | `draft` | Required vehicle inputs incomplete in saved metadata |
+| Quick | `draft` | No photos; vehicle inputs incomplete |
+| Local categories | `capturing` / `capture_failed` | Physical capture in progress / failed |
+| Quick | `awaiting_metadata` | Saved photos with missing metadata, or worker waiting after inference |
 | Quick | `awaiting_photos` | Vehicle complete; no valid original |
 | Quick | `ready_to_scan` | Vehicle complete and at least one valid original |
 | Quick | `analyzing` | Existing scan state queued or processing |
@@ -122,11 +134,11 @@ snapshot; clients must use API state during/after asynchronous scanning.
 | Verification | `before_incomplete` | One or more before sides missing/invalid |
 | Verification | `awaiting_after` | Four before sides present; zero after sides |
 | Verification | `after_incomplete` | Four before sides present; some after sides missing |
-| Verification | `comparison_ready` | All eight valid photographs present |
+| Verification | `comparison_ready` | Both phases contain every required side; captures complete |
 
-New requests require complete vehicle inputs, so normally start in
-`awaiting_photos` or `before_incomplete`. `draft` supports incomplete externally
-edited/imported quick metadata. Verification always returns AI `status:
+Type-only creation starts in `draft` for both local categories. Fully specified
+creation retains the existing `awaiting_photos` / `before_incomplete` read states.
+An empty verification dossier without complete vehicle metadata also returns `draft`. Verification always returns AI `status:
 not_analyzed`, `progress: null`, `result: null`. Missing/corrupt evidence updates
 the comparison's missing-side arrays but cannot unlock finalized inputs.
 
@@ -137,10 +149,12 @@ result, scan, media, WebP preview, PDF, and vehicle routes remain available.
 
 | Method and path | Request | Success |
 | --- | --- | --- |
-| `POST /api/dossiers` | JSON required vehicle fields plus new `type` | `201` full dossier detail |
+| `POST /api/dossiers` | JSON `type`, optional vehicle fields; optional `Idempotency-Key` header | `201` full dossier detail |
 | `GET /api/dossiers` | Optional filters below | `200` paginated summaries/counts |
 | `GET /api/dossiers/{id}` | None | `200` full dossier detail |
-| `PATCH /api/dossiers/{id}` | JSON permitted vehicle edits | `200` full dossier detail |
+| `PATCH /api/dossiers/{id}` or `/{id}/metadata` | JSON permitted vehicle edits | `200` full dossier detail |
+| `POST /api/dossiers/{id}/capture` | `{}` for quick; `{ "phase": "before" }` / `after` for verification | `202` capture status |
+| `GET /api/dossiers/{id}/capture` | Verification requires `?phase=before` / `after` | `200` capture status |
 | `GET /api/dossiers/{id}/result` | None | `200` same detail and saved result |
 | `GET /api/dossiers/{id}/photos` | Optional `phase=before\|after` | `200` `{dossier_id, photos, comparison}` |
 | `POST /api/dossiers/{id}/photos` | Multipart `file`, `side`, optional `phase` | `201` full dossier detail |
@@ -160,7 +174,7 @@ Content-Type: application/json
   "type": "chiffrage_rapide",
   "marque_id": 12,
   "model_id": 34,
-  "matricule": "EXAMPLE-123",
+  "matricule": "14554-B-4578",
   "date_mise_en_circulation": "2020-05-17"
 }
 ```
@@ -168,14 +182,16 @@ Content-Type: application/json
 Use `"type": "verification"` for before/after collection. Unknown JSON fields,
 manual expertise creation, and supplied workflow/scan states are rejected (`422`).
 
-PATCH accepts any nonempty subset of `matricule`, `date_mise_en_circulation`, and
-the pair `marque_id`/`model_id`. Both IDs must be supplied together. Null values
+PATCH accepts any nonempty subset of `matricule`, `date_mise_en_circulation`,
+`annee`, `date_sinistre`, and the pair `marque_id`/`model_id`. Both IDs must be supplied together. Null values
 and unknown fields are rejected. Photos, source, type, timestamps, expert fields,
-and arbitrary metadata cannot be patched. Active/completed scans and finalized
-verification comparisons reject edits (`409`). Example:
+and arbitrary metadata cannot be patched. Quick vehicle edits are allowed during
+capture and image inference, until pricing freezes the vehicle snapshot. Expertise
+inputs, completed analyses, and finalized verification comparisons retain their
+existing protection (`409`). Example:
 
 ```json
-{"matricule": "CORRECTED-123", "date_mise_en_circulation": "2021-06-01"}
+{"matricule": "14554-C-4578", "date_mise_en_circulation": "2021-06-01"}
 ```
 
 ### Original upload and explicit replacement
@@ -226,7 +242,7 @@ Representative verification detail with one original (IDs/URLs shortened):
   "status": "not_analyzed",
   "vehicle": {
     "marque_id": 12, "model_id": 34, "marque": "Dacia", "modele": "Sandero",
-    "matricule": "EXAMPLE-123", "annee": "2020",
+    "matricule": "14554-B-4578", "annee": "2020",
     "date_mise_en_circulation": "2020-05-17", "date_sinistre": null
   },
   "photos": [{
@@ -292,9 +308,10 @@ skipped with safe warnings.
 
 ### Scan admission and saved results
 
-Expertise keeps its existing behavior. Quick scans require complete saved vehicle
-inputs and at least one valid declared photo; every declared original must be
-valid. Only one photographed side is sufficient. Admission uses the existing
+Expertise keeps its existing behavior. Quick scans require at least one valid declared photo; every declared original
+must be valid and any tunnel capture must have completed. Image inference can run
+without vehicle metadata; pricing waits for complete metadata. The real annotations
+remain saved while `progress.stage=awaiting_metadata`. Only one photographed side is sufficient. Admission uses the existing
 AutoEstimate validation, queue, locks, subprocess worker, progress, input
 fingerprints, YOLO detections, pricing, finance calculations, and saved artifacts.
 Poll `/result` until completed/failed. Completed analysis cannot be silently
@@ -315,7 +332,7 @@ Upstream credentials, raw errors, and internal absolute paths are never returned
 | 404 | `dossier_not_found`, `photo_not_found`, `artifact_not_found`, `report_not_found` | Unknown/unavailable allowlisted resource |
 | 409 | `externally_owned_dossier` | New write route cannot edit expertise inputs |
 | 409 | `scan_disabled_for_type` | Verification AI disabled |
-| 409 | `scan_in_progress`, `already_analyzed` | Input snapshot or completed result protected |
+| 409 | `scan_in_progress`, `already_analyzed`, `pricing_in_progress` | Protected photo inputs, completed result, or frozen pricing vehicle |
 | 409 | `before_photos_incomplete` | After collection requires four valid before sides |
 | 409 | `photo_slot_occupied` | Explicit replacement required |
 | 409 | `evidence_finalized` | Before evidence or complete comparison locked |
@@ -349,9 +366,9 @@ they do not validate detection quality or availability of a live AutoEstimate.
 
 - [ ] Open a historical expertise dossier; confirm vehicle, originals, saved analysis, annotations, and PDF still load.
 - [ ] Select actual AutoEstimate IDs, create each supported category, and reopen before scanning.
-- [ ] Confirm incomplete dates, mismatched models, unavailable AutoEstimate, and manual expertise creation fail cleanly.
+- [ ] Confirm type-only creation succeeds offline; provided invalid dates, mismatched models, and manual expertise creation fail cleanly.
 - [ ] Upload one quick photo on one side; start a real scan, observe progress, and open finances, annotations, and PDF.
-- [ ] Confirm a second active/completed scan and changes to protected inputs return `409`.
+- [ ] Confirm duplicate scans and photo edits during inference return `409`; vehicle edits work until pricing freezes them.
 - [ ] Create verification, add four before sides, reopen, add four after sides, and check each paired URL and missing-side list.
 - [ ] Confirm after-before ordering, duplicate slot rejection, explicit replacement/history, and finalized-evidence locks.
 - [ ] Confirm verification scans always fail and no estimate/report is produced.

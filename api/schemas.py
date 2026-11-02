@@ -171,7 +171,7 @@ class ErrorResponse(BaseModel):
 # ============================================================
 
 class ScanProgress(BaseModel):
-    stage: Literal["queued", "preparing", "analyzing_photos", "finalizing", "completed", "failed"]
+    stage: Literal["queued", "preparing", "analyzing_photos", "awaiting_metadata", "finalizing", "completed", "failed"]
     annotations_ready: int = Field(ge=0)
     annotations_expected: int = Field(ge=0)
     photos_completed: int = Field(ge=0)

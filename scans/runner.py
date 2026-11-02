@@ -5,6 +5,7 @@ dates map to the supported pricing year through scans.vehicle.
 """
 
 from pathlib import Path
+import json
 
 import numpy as np
 from PIL import Image
@@ -18,8 +19,9 @@ from scans.backend import MODEL_FILENAMES
 from scans.contracts import ScanRequest, ScanSummary
 from scans.pricing import enrichir_prix_pieces
 from scans.report import generate_report
-from scans.results import build_financial, build_result, prepare_invoice_instances
+from scans.results import build_financial, build_result, prepare_invoice_instances, json_scalar
 from scans.vehicle import pricing_year
+from scans.metadata_gate import await_pricing_metadata
 
 
 # ============================================================
@@ -65,6 +67,10 @@ def analyze_dossier(request: ScanRequest) -> ScanSummary:
         instances = appliquer_feedback_aux_instances(instances, request.feedback)
     instances = appliquer_priorite_remplacement(instances)
     instances = prepare_invoice_instances(instances)
+    publish_json(request.output_dir / ".detections.json", {
+        "detections": json.loads(json.dumps(instances, default=json_scalar, allow_nan=False)),
+    })
+    await_pricing_metadata(request)
     instances = enrichir_prix_pieces(
         instances, request.metadata.get("marque_id"), request.metadata.get("model_id"),
         pricing_year(request.metadata), {},

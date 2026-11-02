@@ -30,6 +30,8 @@ from api.vehicle_routes import router as vehicle_router
 from api.workflow_routes import router as workflow_router
 from api.workflow_service import WorkflowService
 from api.upload_limits import UploadLimitMiddleware
+from api.capture_service import CaptureService
+from api.capture_routes import router as capture_router
 
 
 # ============================================================
@@ -43,9 +45,11 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         await asyncio.to_thread(manager.start)
+        await asyncio.to_thread(application.state.capture_service.start)
         try:
             yield
         finally:
+            await asyncio.to_thread(application.state.capture_service.close)
             await asyncio.to_thread(manager.close)
 
     application = FastAPI(
@@ -61,6 +65,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.state.scan_manager = manager
     application.state.vehicle_catalog = VehicleCatalog()
     application.state.workflow_service = WorkflowService(manager, application.state.vehicle_catalog)
+    application.state.capture_service = CaptureService(application.state.workflow_service, settings)
     application.add_middleware(UploadLimitMiddleware)
     application.add_exception_handler(DossierError, handle_dossier_error)
     application.add_exception_handler(RequestValidationError, handle_validation_error)
@@ -73,13 +78,14 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
             CORSMiddleware,
             allow_origins=list(settings.cors_origins),
             allow_methods=["GET", "POST", "PUT", "PATCH"],
-            allow_headers=["Accept", "Content-Type"],
+            allow_headers=["Accept", "Content-Type", "Idempotency-Key"],
             expose_headers=["Content-Disposition"],
         )
     application.include_router(router)
     application.include_router(scan_router)
     application.include_router(vehicle_router)
     application.include_router(workflow_router)
+    application.include_router(capture_router)
     return application
 
 

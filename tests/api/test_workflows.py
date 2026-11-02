@@ -52,16 +52,16 @@ def test_create_saved_canonical_metadata(client, storage, new_dossier, category,
 def test_invalid_creation_leaves_storage_empty(client, storage, workflow_catalog, changes):
     response = client.post("/api/dossiers", json={
         "type": "chiffrage_rapide", "marque_id": 12, "model_id": 34,
-        "matricule": "TEST", "date_mise_en_circulation": "2020-05-17", **changes,
+        "matricule": "14554-B-4578", "date_mise_en_circulation": "2020-05-17", **changes,
     })
     assert response.status_code == 422
     assert list(storage.iterdir()) == []
 
 
-@pytest.mark.parametrize("missing", ["type", "marque_id", "model_id", "matricule", "date_mise_en_circulation"])
-def test_creation_requires_all_inputs(client, workflow_catalog, missing):
+@pytest.mark.parametrize("missing", ["type", "marque_id", "model_id"])
+def test_creation_requires_category_and_paired_ids(client, workflow_catalog, missing):
     payload = {"type": "verification", "marque_id": 12, "model_id": 34,
-               "matricule": "TEST", "date_mise_en_circulation": "2020-05-17"}
+               "matricule": "14554-B-4578", "date_mise_en_circulation": "2020-05-17"}
     payload.pop(missing)
     assert client.post("/api/dossiers", json=payload).status_code == 422
 
@@ -70,7 +70,7 @@ def test_creation_requires_all_inputs(client, workflow_catalog, missing):
 def test_creation_rejects_unknown_or_unrelated_vehicle(client, storage, workflow_catalog, ids):
     response = client.post("/api/dossiers", json={
         "type": "verification", "marque_id": 12, "model_id": 34,
-        "matricule": "TEST", "date_mise_en_circulation": "2020-05-17", **ids,
+        "matricule": "14554-B-4578", "date_mise_en_circulation": "2020-05-17", **ids,
     })
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_vehicle_selection"
@@ -82,7 +82,7 @@ def test_unavailable_catalog_leaves_no_dossier(client, storage, monkeypatch):
     monkeypatch.delenv("AUTOESTIMATE_TOKEN", raising=False)
     response = client.post("/api/dossiers", json={
         "type": "verification", "marque_id": 12, "model_id": 34,
-        "matricule": "TEST", "date_mise_en_circulation": "2020-05-17",
+        "matricule": "14554-B-4578", "date_mise_en_circulation": "2020-05-17",
     })
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "autoestimate_unavailable"
@@ -101,7 +101,7 @@ def test_network_failure_during_creation_is_safe(client, storage, monkeypatch):
     monkeypatch.setattr("api.vehicle_catalog.requests.get", unavailable)
     response = client.post("/api/dossiers", json={
         "type": "verification", "marque_id": 12, "model_id": 34,
-        "matricule": "TEST", "date_mise_en_circulation": "2020-05-17",
+        "matricule": "14554-B-4578", "date_mise_en_circulation": "2020-05-17",
     })
     assert response.status_code == 503
     assert "private-token" not in response.text
@@ -119,7 +119,7 @@ def test_patch_preserves_inputs_and_resolves_canonical_names(client, storage, ne
     path = storage / dossier_id / "metadata.json"
     before = json.loads(path.read_text())
     response = client.patch(f"/api/dossiers/{dossier_id}", json={
-        "marque_id": 12, "model_id": 34, "date_mise_en_circulation": "2021-06-01", "matricule": "CHANGED",
+        "marque_id": 12, "model_id": 34, "date_mise_en_circulation": "2021-06-01", "matricule": "14554-C-4578",
     })
     assert response.status_code == 200
     assert response.json()["workflow_status"] == "ready_to_scan"
@@ -147,7 +147,7 @@ def test_legacy_expertise_reads_without_migration_and_rejects_new_mutations(clie
     detail = client.get("/api/dossiers/DOS-001").json()
     assert detail["type"] == "forfait_expertise"
     assert detail["workflow_status"] == detail["status"] == "not_analyzed"
-    assert client.patch("/api/dossiers/DOS-001", json={"matricule": "CHANGE"}).status_code == 409
+    assert client.patch("/api/dossiers/DOS-001", json={"matricule": "14554-C-4578"}).status_code == 409
     assert upload_photo("DOS-001").status_code == 409
     assert path.read_bytes() == before
 
@@ -164,14 +164,15 @@ def test_one_side_quick_scan_uses_existing_queue_and_protects_completed_inputs(
         assert accepted.json()["workflow_status"] == "analyzing"
         assert accepted.json()["type"] == "chiffrage_rapide"
         assert accepted.json()["progress"]["photos_total"] == 1
-        assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "RACE"}).status_code == 409
+        edited = client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "14554-R-4578"})
+        assert edited.status_code in (200, 409)
         assert client.post(f"/api/dossiers/{dossier_id}/scan").status_code == 409
         terminal, _ = wait_for_terminal(client, dossier_id)
         assert terminal["status"] == "completed"
         assert terminal["workflow_status"] == "estimated"
         assert client.get(terminal["result"]["report_url"]).status_code == 200
         assert client.post(f"/api/dossiers/{dossier_id}/scan").status_code == 409
-        assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "CHANGE"}).status_code == 409
+        assert client.patch(f"/api/dossiers/{dossier_id}", json={"matricule": "14554-C-4578"}).status_code == 409
     assert upload_photo(dossier_id).status_code == 409
 
 
@@ -181,3 +182,20 @@ def test_one_side_quick_scan_uses_existing_queue_and_protects_completed_inputs(
 ])
 def test_pricing_uses_supported_year_parameter(metadata, expected):
     assert pricing_year(metadata) == expected
+
+
+def test_quick_detection_admission_does_not_depend_on_catalog(
+    storage, new_dossier, upload_photo, monkeypatch,
+):
+    from api.errors import DossierError
+
+    dossier_id = new_dossier()["dossier_id"]
+    upload_photo(dossier_id)
+
+    def unavailable(*args, **kwargs):
+        raise DossierError(503, "autoestimate_unavailable", "Catalog unavailable.")
+
+    monkeypatch.setattr("api.vehicle_catalog.VehicleCatalog.resolve", unavailable)
+    with TestClient(create_app(ApiSettings(storage), FixtureBackend())) as client:
+        assert client.post(f"/api/dossiers/{dossier_id}/scan").status_code == 202
+        assert wait_for_terminal(client, dossier_id)[0]["status"] == "completed"

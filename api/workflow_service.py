@@ -4,7 +4,7 @@ Depends on the existing scan manager, AutoEstimate catalog, and file publishers.
 Externally owned expertise inputs stay under their existing integration contract.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from datetime import datetime, timezone
 import shutil
 from typing import TYPE_CHECKING, Iterator
@@ -38,20 +38,28 @@ class WorkflowService:
         self.repository = manager.repository
         self.catalog = catalog
 
-    def create_dossier(self, request: CreateDossier) -> str:
+    def create_dossier(self, request: CreateDossier, idempotency_key: str | None = None) -> str:
+        from api.creation import create_once
+        return create_once(self, request, idempotency_key)
+
+    def publish_dossier(self, request: CreateDossier, creation_key: str | None = None) -> str:
         self.repository.validate_root()
+        if (request.marque_id is None) != (request.model_id is None):
+            raise DossierError(422, "invalid_vehicle_selection", "Provide both vehicle IDs together.")
         vehicle = self.catalog.resolve(VehicleSelection(
             marque_id=request.marque_id, model_id=request.model_id,
-        ))
+        )).model_dump() if request.marque_id else {"marque": "", "modele": ""}
         dossier_id = f"DOS-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-{uuid4().hex}"
         directory = self.repository.dossiers_dir / dossier_id
         staging = self.repository.dossiers_dir / f".create-{uuid4().hex}"
         now = timestamp()
         metadata = {
-            **request.model_dump(), **vehicle.model_dump(), "dossier_id": dossier_id,
+            **request.model_dump(), **vehicle, "dossier_id": dossier_id,
             "source": "cabek_ai", "created_at": now, "updated_at": now,
-            "annee": request.date_mise_en_circulation[:4], "photos": [], "photo_history": [],
-            "workflow_status": "awaiting_photos" if request.type == "chiffrage_rapide" else "before_incomplete",
+            "annee": request.date_mise_en_circulation[:4] if request.date_mise_en_circulation else None,
+            "photos": [], "photo_history": [], "workflow_status": "draft",
+            "creation_key": creation_key,
+            "creation_request": request.model_dump() if creation_key else None,
         }
         try:
             (staging / "photos").mkdir(parents=True)
@@ -71,24 +79,34 @@ class WorkflowService:
         return dossier_id
 
     @contextmanager
-    def editable_dossier(self, dossier_id: str) -> Iterator[DossierRecord]:
+    def editable_dossier(self, dossier_id: str, *, metadata_only: bool = False,
+                         capture_owned: bool = False) -> Iterator[DossierRecord]:
         dossier = self.repository.read_dossier(dossier_id)
         if dossier.metadata.type == "forfait_expertise":
             raise DossierError(409, "externally_owned_dossier", "Expertise inputs are managed by the originating CABEK application.")
         analysis_dir = self.manager.prepare_analysis_directory(dossier.directory)
         try:
+            with ExitStack() as locks:
+                if not metadata_only:
+                    if not capture_owned:
+                        locks.enter_context(FileLock(str(dossier.directory / ".capture.lock"), timeout=0))
+                    locks.enter_context(FileLock(str(analysis_dir / ".scan.lock"), timeout=0))
+                    locks.enter_context(FileLock(str(analysis_dir / ".worker.lock"), timeout=0))
+                locks.enter_context(FileLock(str(dossier.directory / ".metadata.lock"), timeout=5))
 
-            # Sharing admission and worker locks prevents edits racing queued or surviving scans.
+                # Only vehicle fields can bypass the scan locks; pricing closes that edit window.
 
-            with FileLock(str(analysis_dir / ".scan.lock"), timeout=0):
-                with FileLock(str(analysis_dir / ".worker.lock"), timeout=0):
-                    dossier = self.repository.read_dossier(dossier_id)
-                    self.manager.reject_completed_scan(dossier, analysis_dir)
-                    self.manager.reject_external_scan(analysis_dir)
-                    saved = read_json_object(dossier.directory / "metadata.json", "invalid_metadata")
-                    if dossier.metadata.type == "verification" and (saved.get("evidence_finalized_at") or workflow_status(dossier, "not_analyzed") == "comparison_ready"):
-                        raise DossierError(409, "evidence_finalized", "The complete comparison is immutable.")
-                    yield dossier
+                dossier = self.repository.read_dossier(dossier_id)
+                self.manager.reject_completed_scan(dossier, analysis_dir)
+                self.manager.reject_external_scan(analysis_dir)
+                if metadata_only and (analysis_dir / ".vehicle.json").exists():
+                    record = read_json_object(analysis_dir / "status.json", "invalid_status")
+                    if record.get("status") in ("queued", "processing"):
+                        raise DossierError(409, "pricing_in_progress", "Vehicle metadata is frozen for pricing.")
+                saved = read_json_object(dossier.directory / "metadata.json", "invalid_metadata")
+                if dossier.metadata.type == "verification" and not capture_owned and (saved.get("evidence_finalized_at") or workflow_status(dossier, "not_analyzed") == "comparison_ready"):
+                    raise DossierError(409, "evidence_finalized", "The complete comparison is immutable.")
+                yield dossier
         except Timeout as error:
             raise DossierError(409, "scan_in_progress", "Dossier inputs cannot change during a scan.") from error
         except OSError as error:
@@ -117,11 +135,14 @@ class WorkflowService:
             raise DossierError(422, "invalid_metadata_update", "Provide at least one non-null editable field.")
         if ("marque_id" in changes) != ("model_id" in changes):
             raise DossierError(422, "invalid_vehicle_selection", "Provide both vehicle IDs together.")
-        with self.editable_dossier(dossier_id) as dossier:
-            if "marque_id" in changes:
-                changes.update(self.catalog.resolve(VehicleSelection(
-                    marque_id=changes["marque_id"], model_id=changes["model_id"],
-                )).model_dump())
+        current = self.repository.read_dossier(dossier_id)
+        if current.metadata.type == "forfait_expertise":
+            raise DossierError(409, "externally_owned_dossier", "Expertise inputs are externally managed.")
+        if "marque_id" in changes:
+            changes.update(self.catalog.resolve(VehicleSelection(
+                marque_id=changes["marque_id"], model_id=changes["model_id"],
+            )).model_dump())
+        with self.editable_dossier(dossier_id, metadata_only=True) as dossier:
             if "date_mise_en_circulation" in changes:
                 changes["annee"] = changes["date_mise_en_circulation"][:4]
             metadata = read_json_object(dossier.directory / "metadata.json", "invalid_metadata")

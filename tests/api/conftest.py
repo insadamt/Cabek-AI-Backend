@@ -109,7 +109,7 @@ def new_dossier(client, workflow_catalog):
     def create(category="chiffrage_rapide", **changes):
         response = client.post("/api/dossiers", json={
             "type": category, "marque_id": 12, "model_id": 34,
-            "matricule": "LOCAL-123", "date_mise_en_circulation": "2020-05-17", **changes,
+            "matricule": "14554-B-4578", "date_mise_en_circulation": "2020-05-17", **changes,
         })
         assert response.status_code == 201, response.text
         return response.json()

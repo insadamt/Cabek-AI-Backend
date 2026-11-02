@@ -31,6 +31,9 @@ class PhotoMetadata(BaseModel):
     side: PhotoSide | None = None
     phase: PhotoPhase | None = None
     uploaded_at: str | None = None
+    capture_id: str | None = None
+    original_filename: str | None = None
+    source: str | None = None
 
 
 class DossierMetadata(Vehicle):
@@ -42,6 +45,7 @@ class DossierMetadata(Vehicle):
     before_finalized_at: str | None = None
     evidence_finalized_at: str | None = None
     photos: list[PhotoMetadata] = Field(default_factory=list)
+    captures: dict[str, dict] = Field(default_factory=dict)
 
     @field_validator("marque", "modele", mode="before")
     @classmethod
@@ -58,15 +62,12 @@ class DossierMetadata(Vehicle):
         if self.date_mise_en_circulation is not None:
             validate_registration_date(self.date_mise_en_circulation)
         if self.type != "forfait_expertise":
-            slots = set()
             for photo in self.photos:
                 if photo.side is None:
                     raise ValueError("Workflow photos require a side.")
                 if self.type == "verification":
-                    slot = (photo.phase, photo.side)
-                    if photo.phase is None or slot in slots:
-                        raise ValueError("Verification requires unique phase/side slots.")
-                    slots.add(slot)
+                    if photo.phase is None:
+                        raise ValueError("Verification requires before/after phases.")
                 elif photo.phase is not None:
                     raise ValueError("Quick estimates have no before/after phase.")
         return self
