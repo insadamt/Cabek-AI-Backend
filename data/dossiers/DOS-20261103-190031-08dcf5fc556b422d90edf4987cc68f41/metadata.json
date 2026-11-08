@@ -1,0 +1,96 @@
+{
+  "type": "chiffrage_rapide",
+  "marque_id": 9,
+  "model_id": 70,
+  "matricule": "4545-B-544",
+  "date_mise_en_circulation": "2000-12-12",
+  "marque": "CUPRA",
+  "modele": "Formentor",
+  "dossier_id": "DOS-20261103-190031-08dcf5fc556b422d90edf4987cc68f41",
+  "source": "cabek_ai",
+  "created_at": "2026-11-03T19:00:31.956863+00:00",
+  "updated_at": "2026-11-03T19:00:37.453828+00:00",
+  "annee": "2000",
+  "photos": [
+    {
+      "path": "photos/b465f3f800456a4ae84956422066cb56.jpg",
+      "photo_id": "b465f3f800456a4ae84956422066cb56",
+      "phase": null,
+      "side": "front",
+      "capture_id": "16c810b632b54014b87ab7654267549f",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-03T19:00:34.278444+00:00"
+    },
+    {
+      "path": "photos/72101e472fb5b4e1fd12a629edbecb68.jpg",
+      "photo_id": "72101e472fb5b4e1fd12a629edbecb68",
+      "phase": null,
+      "side": "left",
+      "capture_id": "16c810b632b54014b87ab7654267549f",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-03T19:00:35.071359+00:00"
+    },
+    {
+      "path": "photos/3f1349ba09eeeeeb2173aba9c50baa5c.jpg",
+      "photo_id": "3f1349ba09eeeeeb2173aba9c50baa5c",
+      "phase": null,
+      "side": "rear",
+      "capture_id": "16c810b632b54014b87ab7654267549f",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-03T19:00:35.857969+00:00"
+    },
+    {
+      "path": "photos/941e11fb18b049a0d6b42c5605e70253.jpg",
+      "photo_id": "941e11fb18b049a0d6b42c5605e70253",
+      "phase": null,
+      "side": "right",
+      "capture_id": "16c810b632b54014b87ab7654267549f",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-03T19:00:36.647484+00:00"
+    }
+  ],
+  "photo_history": [],
+  "workflow_status": "analyzing",
+  "creation_key": "57d4834a03f982a1ad24458057664d80925247a2437b34e1e014d2596627a65b",
+  "creation_request": {
+    "type": "chiffrage_rapide",
+    "marque_id": null,
+    "model_id": null,
+    "matricule": "",
+    "date_mise_en_circulation": null
+  },
+  "date_sinistre": "2000-12-12",
+  "captures": {
+    "single": {
+      "capture_id": "16c810b632b54014b87ab7654267549f",
+      "phase": null,
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-03T19:00:34.241800+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-03T19:00:37.453811+00:00",
+      "analysis_error": null
+    }
+  }
+}

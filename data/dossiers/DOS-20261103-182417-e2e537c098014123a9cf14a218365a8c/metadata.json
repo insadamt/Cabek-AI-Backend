@@ -1,0 +1,96 @@
+{
+  "type": "chiffrage_rapide",
+  "marque_id": 3,
+  "model_id": 26,
+  "matricule": "4545-B-545",
+  "date_mise_en_circulation": "2026-11-03",
+  "marque": "Bentley",
+  "modele": "Bentayga",
+  "dossier_id": "DOS-20261103-182417-e2e537c098014123a9cf14a218365a8c",
+  "source": "cabek_ai",
+  "created_at": "2026-11-03T18:24:17.493174+00:00",
+  "updated_at": "2026-11-03T18:28:56.560843+00:00",
+  "annee": "2026",
+  "photos": [
+    {
+      "path": "photos/520656259ec3aaf657df1c8823be45bb.jpg",
+      "photo_id": "520656259ec3aaf657df1c8823be45bb",
+      "phase": null,
+      "side": "front",
+      "capture_id": "5c03333a9c05447c8deb427a7c5ebdac",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-03T18:27:30.463613+00:00"
+    },
+    {
+      "path": "photos/dd5112245c8f7506aa0d703171ba9c65.jpg",
+      "photo_id": "dd5112245c8f7506aa0d703171ba9c65",
+      "phase": null,
+      "side": "left",
+      "capture_id": "5c03333a9c05447c8deb427a7c5ebdac",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-03T18:27:31.232055+00:00"
+    },
+    {
+      "path": "photos/9b1e737b2a86175286eb700ae32d7a02.jpg",
+      "photo_id": "9b1e737b2a86175286eb700ae32d7a02",
+      "phase": null,
+      "side": "rear",
+      "capture_id": "5c03333a9c05447c8deb427a7c5ebdac",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-03T18:27:31.998404+00:00"
+    },
+    {
+      "path": "photos/285b6fbfe20175dcae88a1710e9b4c00.jpg",
+      "photo_id": "285b6fbfe20175dcae88a1710e9b4c00",
+      "phase": null,
+      "side": "right",
+      "capture_id": "5c03333a9c05447c8deb427a7c5ebdac",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-03T18:27:32.795543+00:00"
+    }
+  ],
+  "photo_history": [],
+  "workflow_status": "awaiting_metadata",
+  "creation_key": "32d01384ebaf2f4bc16b4aab691a4dab00026ac2cdaf38dad2196d23c0cd1c26",
+  "creation_request": {
+    "type": "chiffrage_rapide",
+    "marque_id": null,
+    "model_id": null,
+    "matricule": "",
+    "date_mise_en_circulation": null
+  },
+  "captures": {
+    "single": {
+      "capture_id": "5c03333a9c05447c8deb427a7c5ebdac",
+      "phase": null,
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-03T18:27:30.431105+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-03T18:27:33.670547+00:00",
+      "analysis_error": null
+    }
+  },
+  "date_sinistre": "2026-11-03"
+}

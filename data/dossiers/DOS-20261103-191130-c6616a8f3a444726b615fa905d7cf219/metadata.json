@@ -1,0 +1,96 @@
+{
+  "type": "chiffrage_rapide",
+  "marque_id": 8,
+  "model_id": 56,
+  "matricule": "4787-R-58",
+  "date_mise_en_circulation": "2000-12-12",
+  "marque": "Citroën",
+  "modele": "C1",
+  "dossier_id": "DOS-20261103-191130-c6616a8f3a444726b615fa905d7cf219",
+  "source": "cabek_ai",
+  "created_at": "2026-11-03T19:11:30.553062+00:00",
+  "updated_at": "2026-11-03T19:11:35.753638+00:00",
+  "annee": "2000",
+  "photos": [
+    {
+      "path": "photos/9f8278b97840ec198cac39a1acfe9aed.jpg",
+      "photo_id": "9f8278b97840ec198cac39a1acfe9aed",
+      "phase": null,
+      "side": "front",
+      "capture_id": "aa2dd69c8c734493909aad6519af92c2",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-03T19:11:32.575455+00:00"
+    },
+    {
+      "path": "photos/9629c294781b9549bad34c4768bdc79a.jpg",
+      "photo_id": "9629c294781b9549bad34c4768bdc79a",
+      "phase": null,
+      "side": "left",
+      "capture_id": "aa2dd69c8c734493909aad6519af92c2",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-03T19:11:33.350686+00:00"
+    },
+    {
+      "path": "photos/615535d68a2c6bd4af3195cb6c9960fc.jpg",
+      "photo_id": "615535d68a2c6bd4af3195cb6c9960fc",
+      "phase": null,
+      "side": "rear",
+      "capture_id": "aa2dd69c8c734493909aad6519af92c2",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-03T19:11:34.128679+00:00"
+    },
+    {
+      "path": "photos/9a1524c3e5bce86262cf63e035089775.jpg",
+      "photo_id": "9a1524c3e5bce86262cf63e035089775",
+      "phase": null,
+      "side": "right",
+      "capture_id": "aa2dd69c8c734493909aad6519af92c2",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-03T19:11:34.907742+00:00"
+    }
+  ],
+  "photo_history": [],
+  "workflow_status": "analyzing",
+  "creation_key": "44056c6ee1cd73c8e46874b000f10f02061d2e5f36425a6d9b20fede22767133",
+  "creation_request": {
+    "type": "chiffrage_rapide",
+    "marque_id": null,
+    "model_id": null,
+    "matricule": "",
+    "date_mise_en_circulation": null
+  },
+  "date_sinistre": "2000-12-04",
+  "captures": {
+    "single": {
+      "capture_id": "aa2dd69c8c734493909aad6519af92c2",
+      "phase": null,
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-03T19:11:32.555611+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-03T19:11:35.753619+00:00",
+      "analysis_error": null
+    }
+  }
+}

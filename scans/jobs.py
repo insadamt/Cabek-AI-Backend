@@ -16,6 +16,7 @@ from filelock import FileLock, Timeout
 
 from api.config import ApiSettings
 from api.errors import DossierError
+from api.dossier_lifecycle import serialize_dossier
 from api.files import confined_path, read_json_object, validate_image
 from api.repository import DossierRecord, DossierRepository
 from api.schemas import DossierResult, ScanProgress
@@ -66,6 +67,7 @@ class ScanManager:
         if self.recovery_thread is not None:
             self.recovery_thread.join()
 
+    @serialize_dossier(timeout=0)
     def start_scan(self, dossier_id: str) -> DossierResult:
         dossier = self.repository.read_dossier(dossier_id)
         self.reject_disabled_scan(dossier)

@@ -74,8 +74,7 @@ class DossierService:
                     continue
                 if query.created_to and (created is None or created.date() > query.created_to):
                     continue
-                analysis = self.repository.read_analysis(dossier)
-                state = self.repository.read_state(dossier, analysis)
+                analysis, state = self.repository.read_analysis_state(dossier)
                 summaries.append(DossierSummary(
                     dossier_id=dossier_id,
                     type=dossier.metadata.type, source=dossier.metadata.source,
@@ -153,8 +152,7 @@ class DossierService:
     def read_result(self, dossier_id: str, root_path: str = "") -> DossierResult:
         dossier = self.repository.read_dossier(dossier_id)
         base_url = f"{root_path.rstrip('/')}/api/dossiers/{quote(dossier_id, safe='')}"
-        analysis = self.repository.read_analysis(dossier)
-        state = self.repository.read_state(dossier, analysis)
+        analysis, state = self.repository.read_analysis_state(dossier)
         response = DossierResult(
             dossier_id=dossier_id, status=state, progress=self.repository.read_progress(dossier),
             type=dossier.metadata.type, source=dossier.metadata.source,

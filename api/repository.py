@@ -211,6 +211,21 @@ class DossierRepository:
     # SCAN STATE FROM SAVED FILES
     # ============================================================
 
+    def read_analysis_state(self, dossier: DossierRecord) -> tuple[StoredAnalysis | None, ScanState]:
+        analysis = self.read_analysis(dossier)
+        try:
+            state = self.read_state(dossier, analysis)
+        except DossierError as error:
+            if error.code != "invalid_status" or analysis is not None:
+                raise
+
+            # The supervisor can publish completion between these reads. Revalidate
+            # artifacts once; a genuinely invalid completed folder still raises.
+
+            analysis = self.read_analysis(dossier)
+            state = self.read_state(dossier, analysis)
+        return analysis, state
+
     def read_state(self, dossier: DossierRecord, analysis: StoredAnalysis | None) -> ScanState:
         if dossier.metadata.type == "verification":
             return "not_analyzed"

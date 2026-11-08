@@ -44,7 +44,7 @@ class ApiSettings:
             scan_timeout_seconds=float(os.environ.get("CABEK_SCAN_TIMEOUT_SECONDS", "1800")),
             scan_max_pending=int(os.environ.get("CABEK_SCAN_MAX_PENDING", "8")),
             tunnel_mode=os.environ.get("CABEK_TUNNEL_MODE", "disabled"),
-            mock_photos_dir=Path(os.environ["CABEK_MOCK_PHOTOS_DIR"]) if os.environ.get("CABEK_MOCK_PHOTOS_DIR") else None,
+            mock_photos_dir=Path(os.environ.get("CABEK_MOCK_PHOTOS_DIR") or PROJECT_ROOT / ".local" / "tunnel-photos"),
             mock_photo_delay_seconds=float(os.environ.get("CABEK_MOCK_PHOTO_DELAY_SECONDS", "0")),
             cors_origins=tuple(
                 origin.strip()

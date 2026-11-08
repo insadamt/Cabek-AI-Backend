@@ -17,6 +17,7 @@ from filelock import FileLock, Timeout
 
 from api.capture_schemas import CaptureStatus, CapturedPhoto
 from api.errors import DossierError
+from api.dossier_lifecycle import dossier_admission, serialize_dossier
 from api.files import confined_path, read_json_object, validate_image
 from api.tunnel_provider import MockTunnelProvider
 from api.workflow_service import timestamp
@@ -63,6 +64,7 @@ class CaptureService:
     # IDEMPOTENT CAPTURE ADMISSION
     # ============================================================
 
+    @serialize_dossier
     def start_capture(self, dossier_id: str, phase: str | None) -> None:
         if self.settings.tunnel_mode != "mock" or self.stopping.is_set():
             raise DossierError(503, "tunnel_unavailable", "Enable CABEK_TUNNEL_MODE=mock for local capture.")
@@ -150,10 +152,17 @@ class CaptureService:
             code = error.code if isinstance(error, DossierError) else "capture_failed"
             self.update_capture(dossier_id, key, status="failed", error_code=code)
         finally:
-            tunnel_lock.release()
-            capture_lock.release()
-        if completed and not self.stopping.is_set():
-            self.start_analysis(dossier_id, key)
+
+            # Hold stable admission across releasing camera ownership and queuing AI.
+
+            try:
+                with dossier_admission(self.workflows.repository, dossier_id):
+                    capture_lock.release()
+                    if completed and not self.stopping.is_set():
+                        self.start_analysis(dossier_id, key)
+            finally:
+                capture_lock.release()
+                tunnel_lock.release()
 
     def save_sample(self, dossier_id, capture, sample):
         photo_id = hashlib.sha256(f"{capture['capture_id']}:{sample['source']}".encode()).hexdigest()[:32]
@@ -195,11 +204,12 @@ class CaptureService:
             metadata["captures"][key].update(changes, updated_at=timestamp())
             self.workflows.save_metadata(dossier, metadata)
 
+    @serialize_dossier
     def start_analysis(self, dossier_id, key):
         dossier = self.workflows.repository.read_dossier(dossier_id)
         if dossier.metadata.type != "chiffrage_rapide":
             return
-        state = self.workflows.repository.read_state(dossier, self.workflows.repository.read_analysis(dossier))
+        _, state = self.workflows.repository.read_analysis_state(dossier)
         if state != "not_analyzed":
             return
         try:

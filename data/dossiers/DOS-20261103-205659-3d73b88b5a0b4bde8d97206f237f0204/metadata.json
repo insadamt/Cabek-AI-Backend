@@ -1,0 +1,95 @@
+{
+  "type": "chiffrage_rapide",
+  "marque_id": 2,
+  "model_id": 5,
+  "matricule": "45487-E-77",
+  "date_mise_en_circulation": "2000-12-12",
+  "marque": "Audi",
+  "modele": "A1",
+  "dossier_id": "DOS-20261103-205659-3d73b88b5a0b4bde8d97206f237f0204",
+  "source": "cabek_ai",
+  "created_at": "2026-11-03T20:56:59.643509+00:00",
+  "updated_at": "2026-11-04T09:26:46.430898+00:00",
+  "annee": "2000",
+  "photos": [
+    {
+      "path": "photos/596a6d98ba4e6ce8d7556af123f2b33d.jpg",
+      "photo_id": "596a6d98ba4e6ce8d7556af123f2b33d",
+      "phase": null,
+      "side": "front",
+      "capture_id": "c85b9a0446f047e1a3d081839abbac23",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-04T09:26:43.248845+00:00"
+    },
+    {
+      "path": "photos/3709586f7819e3f645ae199149adaa87.jpg",
+      "photo_id": "3709586f7819e3f645ae199149adaa87",
+      "phase": null,
+      "side": "left",
+      "capture_id": "c85b9a0446f047e1a3d081839abbac23",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-04T09:26:44.033335+00:00"
+    },
+    {
+      "path": "photos/34522e6cbb59b9105670c97e45f2c5b1.jpg",
+      "photo_id": "34522e6cbb59b9105670c97e45f2c5b1",
+      "phase": null,
+      "side": "rear",
+      "capture_id": "c85b9a0446f047e1a3d081839abbac23",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-04T09:26:44.812290+00:00"
+    },
+    {
+      "path": "photos/cb55dc1b78547a23e1f6e8fb9140f3c3.jpg",
+      "photo_id": "cb55dc1b78547a23e1f6e8fb9140f3c3",
+      "phase": null,
+      "side": "right",
+      "capture_id": "c85b9a0446f047e1a3d081839abbac23",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-04T09:26:45.589055+00:00"
+    }
+  ],
+  "photo_history": [],
+  "workflow_status": "analyzing",
+  "creation_key": "71798b9378006f6d613f13736678b0cc6cd58398087e82beb0a0da673200bb33",
+  "creation_request": {
+    "type": "chiffrage_rapide",
+    "marque_id": null,
+    "model_id": null,
+    "matricule": "",
+    "date_mise_en_circulation": null
+  },
+  "captures": {
+    "single": {
+      "capture_id": "c85b9a0446f047e1a3d081839abbac23",
+      "phase": null,
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-04T09:26:43.198954+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-04T09:26:46.430879+00:00",
+      "analysis_error": null
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "type": "chiffrage_rapide",
+  "marque_id": 2,
+  "model_id": 7,
+  "matricule": "5894-B-78",
+  "date_mise_en_circulation": "2000-12-12",
+  "marque": "Audi",
+  "modele": "A3 Sportback",
+  "dossier_id": "DOS-20261105-101703-90e22e6714e049ed990c1d1ca222c16d",
+  "source": "cabek_ai",
+  "created_at": "2026-11-05T10:17:03.952598+00:00",
+  "updated_at": "2026-11-05T10:17:49.968789+00:00",
+  "annee": "2000",
+  "photos": [
+    {
+      "path": "photos/ac1e39d5949731482e0f88b83965deec.jpg",
+      "photo_id": "ac1e39d5949731482e0f88b83965deec",
+      "phase": null,
+      "side": "front",
+      "capture_id": "9551ad7b9d4c4ba4989c4d5eb42874d4",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-05T10:17:46.790648+00:00"
+    },
+    {
+      "path": "photos/88fd3ffe681c8e3baff0d49d5f7f5db0.jpg",
+      "photo_id": "88fd3ffe681c8e3baff0d49d5f7f5db0",
+      "phase": null,
+      "side": "left",
+      "capture_id": "9551ad7b9d4c4ba4989c4d5eb42874d4",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-05T10:17:47.565105+00:00"
+    },
+    {
+      "path": "photos/f559d9253d9bbe0c1a31d545a82ed88a.jpg",
+      "photo_id": "f559d9253d9bbe0c1a31d545a82ed88a",
+      "phase": null,
+      "side": "rear",
+      "capture_id": "9551ad7b9d4c4ba4989c4d5eb42874d4",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-05T10:17:48.346623+00:00"
+    },
+    {
+      "path": "photos/1cfdcd67dbc4005c49eae05f43f277fe.jpg",
+      "photo_id": "1cfdcd67dbc4005c49eae05f43f277fe",
+      "phase": null,
+      "side": "right",
+      "capture_id": "9551ad7b9d4c4ba4989c4d5eb42874d4",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-05T10:17:49.120212+00:00"
+    }
+  ],
+  "photo_history": [],
+  "workflow_status": "analyzing",
+  "creation_key": "f0a065386371b4e034686ac27d186d1e0245a98b98ba546045b8ff9f6900af6a",
+  "creation_request": {
+    "type": "chiffrage_rapide",
+    "marque_id": null,
+    "model_id": null,
+    "matricule": "",
+    "date_mise_en_circulation": null
+  },
+  "captures": {
+    "single": {
+      "capture_id": "9551ad7b9d4c4ba4989c4d5eb42874d4",
+      "phase": null,
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-05T10:17:46.765437+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-05T10:17:49.968769+00:00",
+      "analysis_error": null
+    }
+  }
+}

@@ -1,0 +1,162 @@
+{
+  "type": "verification",
+  "marque_id": 3,
+  "model_id": 26,
+  "matricule": "4564-E-54",
+  "date_mise_en_circulation": "2000-12-12",
+  "marque": "Bentley",
+  "modele": "Bentayga",
+  "dossier_id": "DOS-20261103-182936-322a15c18f0249d789b2925e555cc6a7",
+  "source": "cabek_ai",
+  "created_at": "2026-11-03T18:29:36.066788+00:00",
+  "updated_at": "2026-11-03T19:10:39.840119+00:00",
+  "annee": "2000",
+  "photos": [
+    {
+      "path": "photos/before/3f9932b10cbe67318e4cb3e744ebcd76.jpg",
+      "photo_id": "3f9932b10cbe67318e4cb3e744ebcd76",
+      "phase": "before",
+      "side": "front",
+      "capture_id": "747a82397ec34e15a660077f02159781",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-03T18:29:36.178950+00:00"
+    },
+    {
+      "path": "photos/before/4f560b158c2504aa267cd730fb8a8dee.jpg",
+      "photo_id": "4f560b158c2504aa267cd730fb8a8dee",
+      "phase": "before",
+      "side": "left",
+      "capture_id": "747a82397ec34e15a660077f02159781",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-03T18:29:36.957576+00:00"
+    },
+    {
+      "path": "photos/before/94809157b9b2f9ef9d74e4c63a8ef9da.jpg",
+      "photo_id": "94809157b9b2f9ef9d74e4c63a8ef9da",
+      "phase": "before",
+      "side": "rear",
+      "capture_id": "747a82397ec34e15a660077f02159781",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-03T18:29:37.741407+00:00"
+    },
+    {
+      "path": "photos/before/63dda33d6367028567d153eba066b30f.jpg",
+      "photo_id": "63dda33d6367028567d153eba066b30f",
+      "phase": "before",
+      "side": "right",
+      "capture_id": "747a82397ec34e15a660077f02159781",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-03T18:29:38.548330+00:00"
+    },
+    {
+      "path": "photos/after/8cfb65181d523fb700741cd094c826e5.jpg",
+      "photo_id": "8cfb65181d523fb700741cd094c826e5",
+      "phase": "after",
+      "side": "front",
+      "capture_id": "3d4ae9f4fba346448e5d537ee27fe36a",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-03T19:10:36.693741+00:00"
+    },
+    {
+      "path": "photos/after/45abcbe941a84a5fb514836e872876c9.jpg",
+      "photo_id": "45abcbe941a84a5fb514836e872876c9",
+      "phase": "after",
+      "side": "left",
+      "capture_id": "3d4ae9f4fba346448e5d537ee27fe36a",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-03T19:10:37.477186+00:00"
+    },
+    {
+      "path": "photos/after/2b07a43bb7a2ca35281ac1d8b86b58b8.jpg",
+      "photo_id": "2b07a43bb7a2ca35281ac1d8b86b58b8",
+      "phase": "after",
+      "side": "rear",
+      "capture_id": "3d4ae9f4fba346448e5d537ee27fe36a",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-03T19:10:38.264986+00:00"
+    },
+    {
+      "path": "photos/after/098eb2d986324822c0c0931477fffac3.jpg",
+      "photo_id": "098eb2d986324822c0c0931477fffac3",
+      "phase": "after",
+      "side": "right",
+      "capture_id": "3d4ae9f4fba346448e5d537ee27fe36a",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-03T19:10:39.043645+00:00"
+    }
+  ],
+  "photo_history": [],
+  "workflow_status": "comparison_ready",
+  "creation_key": "eedc164b2d0645a21b0689c994961c7ad085fc95552a6e3977e602e9d8b8e7b3",
+  "creation_request": {
+    "type": "verification",
+    "marque_id": null,
+    "model_id": null,
+    "matricule": "",
+    "date_mise_en_circulation": null
+  },
+  "captures": {
+    "before": {
+      "capture_id": "747a82397ec34e15a660077f02159781",
+      "phase": "before",
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-03T18:29:36.163021+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-03T18:29:39.346405+00:00"
+    },
+    "after": {
+      "capture_id": "3d4ae9f4fba346448e5d537ee27fe36a",
+      "phase": "after",
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-03T19:10:36.681311+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-03T19:10:39.840084+00:00"
+    }
+  },
+  "before_finalized_at": "2026-11-03T19:10:36.698720+00:00",
+  "evidence_finalized_at": "2026-11-03T19:10:39.848814+00:00"
+}

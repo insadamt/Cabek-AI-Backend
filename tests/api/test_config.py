@@ -57,3 +57,10 @@ def test_mock_tunnel_environment(monkeypatch, tmp_path):
     assert settings.tunnel_mode == "mock"
     assert settings.mock_photos_dir == tmp_path
     assert settings.mock_photo_delay_seconds == 0.25
+
+
+def test_default_mock_photos_belong_to_backend(tmp_path, monkeypatch):
+    monkeypatch.setattr("api.config.PROJECT_ROOT", tmp_path)
+    monkeypatch.setenv("CABEK_MOCK_PHOTOS_DIR", "")
+    settings = ApiSettings.from_environment()
+    assert settings.mock_photos_dir == tmp_path / ".local" / "tunnel-photos"

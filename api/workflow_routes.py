@@ -6,7 +6,8 @@ uploads keep explicit scan admission; tunnel capture has its own automatic hando
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
+from api.deletion import delete_dossier
 from pydantic import BaseModel
 
 from api.photo_service import PhotoService
@@ -85,3 +86,9 @@ def replace_photo(dossier_id: DossierId, photo_id: str, request: Request, workfl
         dossier_id=dossier_id, upload=file, side=side, phase=phase, replace_photo_id=photo_id,
     )
     return service.read_result(dossier_id, request.scope.get("root_path", ""))
+
+
+@router.delete("/{dossier_id}", status_code=204, response_class=Response)
+def remove_dossier(dossier_id: DossierId, request: Request):
+    delete_dossier(request.app.state.workflow_service.manager, dossier_id)
+    return Response(status_code=204)

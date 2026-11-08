@@ -14,3 +14,14 @@ __pycache__/
 
 data/dossiers/**/analysis/
 
+
+# Private AI workspace and lifecycle coordination files.
+.ai/
+.instructions.md
+.instruction.md
+.instrcutions.md
+data/dossiers/.lifecycle-locks/
+data/dossiers/.delete-*/
+
+# Backend-owned private photographs used by the simulated tunnel.
+.local/

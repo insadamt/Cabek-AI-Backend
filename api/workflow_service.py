@@ -13,6 +13,7 @@ from uuid import uuid4
 from filelock import FileLock, Timeout
 
 from api.errors import DossierError
+from api.dossier_lifecycle import dossier_admission
 from api.files import confined_path, read_json_object
 from api.repository import DossierMetadata, DossierRecord
 from api.vehicle_catalog import VehicleCatalog, VehicleSelection
@@ -81,6 +82,12 @@ class WorkflowService:
     @contextmanager
     def editable_dossier(self, dossier_id: str, *, metadata_only: bool = False,
                          capture_owned: bool = False) -> Iterator[DossierRecord]:
+        with dossier_admission(self.repository, dossier_id):
+            with self._editable_dossier(dossier_id, metadata_only=metadata_only, capture_owned=capture_owned) as dossier:
+                yield dossier
+
+    @contextmanager
+    def _editable_dossier(self, dossier_id, *, metadata_only=False, capture_owned=False):
         dossier = self.repository.read_dossier(dossier_id)
         if dossier.metadata.type == "forfait_expertise":
             raise DossierError(409, "externally_owned_dossier", "Expertise inputs are managed by the originating CABEK application.")
@@ -117,8 +124,8 @@ class WorkflowService:
         validated = DossierMetadata.model_validate(metadata)
         candidate = DossierRecord(dossier.directory, validated,
                                   self.repository.photo_manifest(dossier.directory, validated))
-        analysis = self.repository.read_analysis(candidate)
-        metadata["workflow_status"] = workflow_status(candidate, self.repository.read_state(candidate, analysis))
+        _, state = self.repository.read_analysis_state(candidate)
+        metadata["workflow_status"] = workflow_status(candidate, state)
         if metadata["type"] == "verification":
 
             # A deleted or corrupted file must not unlock evidence that was already finalized.
