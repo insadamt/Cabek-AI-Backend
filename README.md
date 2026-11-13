@@ -8,6 +8,10 @@ Le contrat frontend est décrit dans [docs/dossier-workflows-api.md](docs/dossie
 Le tunnel local simulé importe de vraies photos et déclenche les modèles existants.
 Configuration et parcours complet : [docs/tunnel-capture-api.md](docs/tunnel-capture-api.md).
 
+Le contrôle local ESP32 est intégré au cycle de capture côté backend :
+[API et configuration éclairage](docs/lighting-api.md). Le frontend réutilise son
+appel de capture existant ; aucun jeton matériel ne doit être publié au navigateur.
+
 ## API FastAPI
 
 Les endpoints de lecture des dossiers, résultats enregistrés, images et PDF sont

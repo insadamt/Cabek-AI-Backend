@@ -191,7 +191,9 @@ def test_unknown_dossier_and_scan_route_documentation(client):
     assert client.get("/api/dossiers/DOS-UNKNOWN/result").status_code == 404
     assert client.post("/api/dossiers/DOS-001/scan").status_code == 404
     paths = client.get("/openapi.json").json()["paths"]
-    assert len(paths) == 14
+    assert {
+        "/api/v1/lights/status", "/api/v1/lights/state", "/api/v1/lights/test",
+    } <= paths.keys()
     assert "patch" in paths["/api/dossiers/{dossier_id}/metadata"]
     assert {"get", "post"} <= paths["/api/dossiers/{dossier_id}/capture"].keys()
     assert "image/webp" in paths["/api/dossiers/{dossier_id}/preview/{path}"]["get"]["responses"]["200"]["content"]

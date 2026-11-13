@@ -9,3 +9,5 @@ filelock>=3.16,<4
 python-dotenv>=1,<2
 requests>=2.32,<3
 python-multipart>=0.0.18,<1
+# Persistent local lighting serial transport; no firmware change required.
+pyserial>=3.5,<4

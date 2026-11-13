@@ -29,11 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class CaptureService:
-    def __init__(self, workflows, settings):
+    def __init__(self, workflows, settings, lighting=None):
         if settings.tunnel_mode not in ("disabled", "mock"):
             raise ValueError("Only disabled and mock tunnel modes are supported.")
         if not isfinite(settings.mock_photo_delay_seconds) or settings.mock_photo_delay_seconds < 0:
             raise ValueError("Camera delivery delay must be finite and nonnegative.")
+        self.lighting = lighting
         self.workflows = workflows
         self.settings = settings
         self.provider = MockTunnelProvider(settings.mock_photos_dir)
@@ -137,6 +138,8 @@ class CaptureService:
     def deliver_photos(self, dossier_id, key, capture, capture_lock, tunnel_lock):
         completed = False
         try:
+            if self.lighting is not None:
+                self.lighting.begin_capture(capture["capture_id"])
             for sample in capture["samples"]:
                 if self.stopping.is_set():
                     raise DossierError(503, "capture_interrupted", "Capture interrupted.")
@@ -152,6 +155,8 @@ class CaptureService:
             code = error.code if isinstance(error, DossierError) else "capture_failed"
             self.update_capture(dossier_id, key, status="failed", error_code=code)
         finally:
+            if self.lighting is not None:
+                self.lighting.finish_capture(capture["capture_id"], completed and not self.stopping.is_set())
 
             # Hold stable admission across releasing camera ownership and queuing AI.
 

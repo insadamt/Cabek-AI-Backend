@@ -3,11 +3,13 @@
 Depends on dotenv and pathlib; camera delivery delay never controls AI execution.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+from api.lighting_config import LightingSettings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +30,8 @@ class ApiSettings:
     mock_photos_dir: Path | None = None
     mock_photo_delay_seconds: float = 0
 
+    lighting: LightingSettings = field(default_factory=LightingSettings)
+
     @classmethod
     def from_environment(cls) -> "ApiSettings":
 
@@ -39,6 +43,7 @@ class ApiSettings:
 
         default_root = Path(__file__).resolve().parents[1] / "data" / "dossiers"
         return cls(
+            lighting=LightingSettings.from_environment(),
             dossiers_dir=Path(os.environ.get("CABEK_DOSSIERS_DIR", default_root)),
             models_dir=Path(os.environ.get("CABEK_MODELS_DIR", default_root.parents[1] / "models")),
             scan_timeout_seconds=float(os.environ.get("CABEK_SCAN_TIMEOUT_SECONDS", "1800")),

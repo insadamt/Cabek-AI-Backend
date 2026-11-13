@@ -1,7 +1,7 @@
 """Configure the local FastAPI integration and shared dossier/scan services.
 
 Depends on configured file storage and optional model workers; write endpoints
-share scan locks and remain inside the documented unauthenticated local boundary.
+share scan locks inside the trusted local boundary; lighting adds bearer access.
 """
 
 import asyncio
@@ -32,25 +32,36 @@ from api.workflow_service import WorkflowService
 from api.upload_limits import UploadLimitMiddleware
 from api.capture_service import CaptureService
 from api.capture_routes import router as capture_router
+from api.lighting_service import LightingService
+from api.lighting_routes import router as lighting_router
+from api.lighting_readiness import check_capture_readiness
 
 
 # ============================================================
 # APPLICATION SETUP
 # ============================================================
 
-def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | None = None) -> FastAPI:
+def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | None = None,
+               lighting: LightingService | None = None) -> FastAPI:
     settings = settings or ApiSettings.from_environment()
     manager = ScanManager(settings, scan_backend)
+    lighting = lighting or LightingService(settings.lighting)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
-        await asyncio.to_thread(manager.start)
-        await asyncio.to_thread(application.state.capture_service.start)
+        lighting.start()
+        lighting.initialize()
         try:
+            await asyncio.to_thread(manager.start)
+            await asyncio.to_thread(application.state.capture_service.start)
+            lighting.set_readiness_probe(lambda: check_capture_readiness(manager, application.state.capture_service))
             yield
         finally:
-            await asyncio.to_thread(application.state.capture_service.close)
-            await asyncio.to_thread(manager.close)
+            try:
+                await asyncio.to_thread(application.state.capture_service.close)
+                await asyncio.to_thread(manager.close)
+            finally:
+                await asyncio.to_thread(lighting.close)
 
     application = FastAPI(
         title="CABEK Dossier API",
@@ -63,9 +74,10 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
 
     application.state.dossier_service = DossierService(DossierRepository(settings.dossiers_dir))
     application.state.scan_manager = manager
+    application.state.lighting = lighting
     application.state.vehicle_catalog = VehicleCatalog()
     application.state.workflow_service = WorkflowService(manager, application.state.vehicle_catalog)
-    application.state.capture_service = CaptureService(application.state.workflow_service, settings)
+    application.state.capture_service = CaptureService(application.state.workflow_service, settings, lighting.state)
     application.add_middleware(UploadLimitMiddleware)
     application.add_exception_handler(DossierError, handle_dossier_error)
     application.add_exception_handler(RequestValidationError, handle_validation_error)
@@ -86,6 +98,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(vehicle_router)
     application.include_router(workflow_router)
     application.include_router(capture_router)
+    application.include_router(lighting_router)
     return application
 
 
