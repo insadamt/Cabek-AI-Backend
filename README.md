@@ -9,7 +9,7 @@ Le tunnel local simulé importe de vraies photos et déclenche les modèles exis
 Configuration et parcours complet : [docs/tunnel-capture-api.md](docs/tunnel-capture-api.md).
 
 Le contrôle local ESP32 est intégré au cycle de capture côté backend :
-[API et configuration éclairage](docs/lighting-api.md). Le frontend réutilise son
+[API et configuration éclairage](../cabek-esp32/docs/lighting-api.md). Le frontend réutilise son
 appel de capture existant ; aucun jeton matériel ne doit être publié au navigateur.
 
 ## API FastAPI
@@ -72,3 +72,6 @@ CABEK_AI_GLOBAL/
 ```
 
 Le modèle `best_zone_critique.pt` est utilisé par le moteur pour intersecter le masque de zone critique avec le masque d'une `d_bosse`. Si l'intersection dépasse le seuil configuré, la bosse est forcée à `high` et le remplacement est déclenché par les règles métier existantes.
+
+Lighting APIs and USB ownership live in `cabek-esp32`. This application only sends
+lifecycle snapshots using `CABEK_LIGHTS_API_URL` and a server-side control token.

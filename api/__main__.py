@@ -9,7 +9,7 @@ import argparse
 import uvicorn
 
 from api.config import ApiSettings
-from api.lighting_service import LightingService
+from api.lighting_client import LightingClient
 
 
 # ============================================================
@@ -27,7 +27,7 @@ def main() -> None:
         return
     if arguments.reload:
         parser.error("Lighting requires one persistent process; omit --reload.")
-    lighting = LightingService(settings.lighting)
+    lighting = LightingClient(settings.lighting)
     lighting.start()
     try:
         from api.main import create_app

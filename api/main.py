@@ -1,7 +1,7 @@
 """Configure the local FastAPI integration and shared dossier/scan services.
 
 Depends on configured file storage and optional model workers; write endpoints
-share scan locks inside the trusted local boundary; lighting adds bearer access.
+share scan locks inside the trusted local boundary; lighting events are sent to the separate ESP32 API.
 """
 
 import asyncio
@@ -32,8 +32,7 @@ from api.workflow_service import WorkflowService
 from api.upload_limits import UploadLimitMiddleware
 from api.capture_service import CaptureService
 from api.capture_routes import router as capture_router
-from api.lighting_service import LightingService
-from api.lighting_routes import router as lighting_router
+from api.lighting_client import LightingClient
 from api.lighting_readiness import check_capture_readiness
 
 
@@ -42,10 +41,10 @@ from api.lighting_readiness import check_capture_readiness
 # ============================================================
 
 def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | None = None,
-               lighting: LightingService | None = None) -> FastAPI:
+               lighting: LightingClient | None = None) -> FastAPI:
     settings = settings or ApiSettings.from_environment()
     manager = ScanManager(settings, scan_backend)
-    lighting = lighting or LightingService(settings.lighting)
+    lighting = lighting or LightingClient(settings.lighting)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -98,7 +97,6 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(vehicle_router)
     application.include_router(workflow_router)
     application.include_router(capture_router)
-    application.include_router(lighting_router)
     return application
 
 

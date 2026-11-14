@@ -9,7 +9,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from api.lighting_config import LightingSettings
+from api.lighting_client import LightingSettings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
