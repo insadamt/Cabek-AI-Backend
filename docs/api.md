@@ -440,3 +440,23 @@ WebP preview manual checklist:
 - Revalidate with `If-None-Match`; expect `304`, then change the source and expect `200` with a new ETag.
 - Confirm original downloads, scan inputs, and saved analysis files are unchanged.
 - Confirm missing, corrupt, undeclared, and escaping source paths remain blocked.
+
+## Local hardware settings
+
+The frontend opens `/settings` after five rapid clicks on the Dynamic Island.
+CABEK AI provides `POST /api/settings/lights/set` (JSON effect request) and
+`POST /api/settings/lights/off` (no body). These settings actions require a
+loopback client and `CABEK_LIGHTS_ENABLED=1`; they forward to the independent
+lighting service configured by server-side `CABEK_LIGHTS_API_URL`.
+
+SET fields and upstream 200/202/409/422/501/503 results follow the
+[lighting contract](../../cabek-esp32/docs/lighting-api.md). Unreachable hardware
+or service returns 503; malformed/redirected upstream replies return 502. Disabled
+lighting returns 503; non-local clients return 403. Preserve local-only access in
+reverse proxies; Vite enforces the same boundary before forwarding.
+
+Accepted manual tests cancel the old completion countdown and replace pending lighting
+commands. They share serialized HTTP delivery with automatic effects, and failed
+manual tests are reported to the caller rather than retried later. Capture
+requests remain independent of network latency; new captures continue to choose
+their automatic lighting. The browser never contacts the serial service directly.

@@ -91,3 +91,44 @@ def test_successful_command_is_not_repeated_and_failures_retry():
     finally:
         client.close()
     assert calls[-1] == ('/off', None)
+
+
+def test_manual_test_cancels_completion_and_consumes_previous_pending_command():
+    calls = []
+    client = LightingClient(LightingSettings(), send=lambda path, payload: calls.append((path, payload)) or (200, {'success': True}))
+    client.begin_capture('one')
+    client.finish_capture('one', True)
+    assert client.completion_deadline is not None
+    result = client.send_manual_command('/off', None)
+    assert result == (200, {'success': True})
+    assert client.completion_deadline is None
+    assert client.sent_revision == client.revision
+    assert client.prepare_command()[1:] == ('/off', None)
+    assert calls == [('/off', None)]
+
+
+def test_failed_manual_test_preserves_the_previous_automatic_command():
+    import pytest
+    def unavailable(*args):
+        raise OSError('offline')
+    client = LightingClient(LightingSettings(), send=unavailable)
+    client.begin_capture('one')
+    client.finish_capture('one', True)
+    previous = client.prepare_command()
+    deadline = client.completion_deadline
+    with pytest.raises(OSError):
+        client.send_manual_command('/set', {'effect': 'solid'})
+    assert client.prepare_command() == previous
+    assert client.completion_deadline == deadline
+
+
+def test_new_capture_during_manual_delivery_remains_the_latest_command():
+    client = LightingClient(LightingSettings())
+    def send(path, payload):
+        client.begin_capture('new')
+        return 200, {'success': True}
+    client.send = send
+    client.send_manual_command('/off', None)
+    assert client.capture_id == 'new'
+    assert client.prepare_command()[2] == {'effect': 'pulse', 'color': '#FF0000', 'repeat': True}
+    assert client.sent_revision != client.revision

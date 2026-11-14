@@ -33,6 +33,7 @@ from api.upload_limits import UploadLimitMiddleware
 from api.capture_service import CaptureService
 from api.capture_routes import router as capture_router
 from api.lighting_client import LightingClient
+from api.settings_routes import router as settings_router
 
 
 # ============================================================
@@ -95,6 +96,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(vehicle_router)
     application.include_router(workflow_router)
     application.include_router(capture_router)
+    application.include_router(settings_router)
     return application
 
 

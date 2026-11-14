@@ -8,7 +8,7 @@ import json
 import logging
 import math
 import os
-from threading import Event, RLock, Thread
+from threading import Event, Lock, RLock, Thread
 import time
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
@@ -48,6 +48,8 @@ class LightingClient:
         self.settings = settings
         self.clock = clock
         self.lock = RLock()
+        self.command_lock = Lock()
+        self.sent_revision = -1
         self.capture_id = None
         self.completion_deadline = None
         self.path = '/off'
@@ -104,22 +106,42 @@ class LightingClient:
         opener = build_opener(ProxyHandler({}), NoRedirect())
         with opener.open(request, timeout=self.settings.timeout) as response:
             result = json.load(response)
+            if not isinstance(result, dict):
+                raise ValueError('Invalid lighting response')
             if response.status not in (200, 202) or result.get('success') is not True:
                 raise OSError('Lighting command was not accepted')
+            return response.status, result
+
+    def send_manual_command(self, path, payload):
+        # Serialize with automatic HTTP calls so stale retries cannot overwrite a manual test.
+
+        with self.command_lock:
+            with self.lock:
+                previous_revision = self.revision
+            result = self.send(path, payload)
+            with self.lock:
+                # Preserve a newer capture event that arrived during the manual HTTP request.
+
+                if self.revision == previous_revision:
+                    self.completion_deadline = None
+                    self.path, self.payload = path, payload
+                    self.revision += 1
+                    self.sent_revision = self.revision
+            return result
 
     def run(self):
-        sent_revision = -1
         while True:
             self.wake.clear()
-            revision, path, payload = self.prepare_command()
-            if revision != sent_revision:
-                try:
-                    self.send(path, payload)
-                    sent_revision = revision
-                except Exception as error:
-                    logger.warning('Lighting API unavailable: %s', type(error).__name__)
+            with self.command_lock:
+                revision, path, payload = self.prepare_command()
+                if revision != self.sent_revision:
+                    try:
+                        self.send(path, payload)
+                        self.sent_revision = revision
+                    except Exception as error:
+                        logger.warning('Lighting API unavailable: %s', type(error).__name__)
             with self.lock:
-                # Recheck after slow HTTP so a shutdown arriving during a request still sends OFF.
+                # Recheck after slow HTTP so shutdown arriving during a request still sends OFF.
 
                 if self.stopping and revision == self.revision:
                     return
