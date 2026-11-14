@@ -1,7 +1,7 @@
 """Create and edit locally owned dossiers with atomic publication and scan locks.
 
 Depends on the existing scan manager, AutoEstimate catalog, and file publishers.
-Externally owned expertise inputs stay under their existing integration contract.
+Expertise metadata stays external; only capture-owned photo writes may edit its manifest.
 """
 
 from contextlib import contextmanager, ExitStack
@@ -89,7 +89,7 @@ class WorkflowService:
     @contextmanager
     def _editable_dossier(self, dossier_id, *, metadata_only=False, capture_owned=False):
         dossier = self.repository.read_dossier(dossier_id)
-        if dossier.metadata.type == "forfait_expertise":
+        if dossier.metadata.type == "forfait_expertise" and (not capture_owned or metadata_only):
             raise DossierError(409, "externally_owned_dossier", "Expertise inputs are managed by the originating CABEK application.")
         analysis_dir = self.manager.prepare_analysis_directory(dossier.directory)
         try:
@@ -126,7 +126,7 @@ class WorkflowService:
                                   self.repository.photo_manifest(dossier.directory, validated))
         _, state = self.repository.read_analysis_state(candidate)
         metadata["workflow_status"] = workflow_status(candidate, state)
-        if metadata["type"] == "verification":
+        if metadata.get("type", "forfait_expertise") == "verification":
 
             # A deleted or corrupted file must not unlock evidence that was already finalized.
 

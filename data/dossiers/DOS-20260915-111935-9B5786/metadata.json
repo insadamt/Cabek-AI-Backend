@@ -8,39 +8,126 @@
   "status": "À valider",
   "photos": [
     {
+      "path": "photos/871107518f477381fc8efcc6db8157e9.jpg",
+      "photo_id": "871107518f477381fc8efcc6db8157e9",
+      "phase": null,
+      "side": "front",
+      "capture_id": "b0092e998a324d90bca047d60d4d1881",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-09T14:15:16.108780+00:00"
+    },
+    {
+      "path": "photos/b590a5c853dbf8f6da2fe578b3393e2e.jpg",
+      "photo_id": "b590a5c853dbf8f6da2fe578b3393e2e",
+      "phase": null,
+      "side": "left",
+      "capture_id": "b0092e998a324d90bca047d60d4d1881",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-09T14:15:16.892540+00:00"
+    },
+    {
+      "path": "photos/f9ba9961596445e7cc7c3acf49dc59a6.jpg",
+      "photo_id": "f9ba9961596445e7cc7c3acf49dc59a6",
+      "phase": null,
+      "side": "rear",
+      "capture_id": "b0092e998a324d90bca047d60d4d1881",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-09T14:15:17.683044+00:00"
+    },
+    {
+      "path": "photos/a083b0fb4f897ffa91579fcab0ddee00.jpg",
+      "photo_id": "a083b0fb4f897ffa91579fcab0ddee00",
+      "phase": null,
+      "side": "right",
+      "capture_id": "b0092e998a324d90bca047d60d4d1881",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-09T14:15:18.478192+00:00"
+    }
+  ],
+  "updated_at": "2026-11-09T14:15:19.341366+00:00",
+  "marque_id": 10,
+  "model_id": 75,
+  "annee": null,
+  "date_sinistre": null,
+  "captures": {
+    "single": {
+      "capture_id": "b0092e998a324d90bca047d60d4d1881",
+      "phase": null,
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-09T14:15:16.085047+00:00",
+      "status": "completed",
+      "error_code": null,
+      "updated_at": "2026-11-09T14:15:19.260575+00:00",
+      "analysis_error": null
+    }
+  },
+  "photo_history": [
+    {
       "view": "avant",
       "view_label": "Vue avant",
       "filename": "avant_01.jpg",
-      "path": "photos/avant_01.jpg"
+      "path": "photos/avant_01.jpg",
+      "replaced_at": "2026-11-09T14:15:16.085059+00:00",
+      "replaced_by": "b0092e998a324d90bca047d60d4d1881",
+      "reason": "capture_restarted"
     },
     {
       "view": "arriere",
       "view_label": "Vue arrière",
       "filename": "arriere_01.jpg",
-      "path": "photos/arriere_01.jpg"
+      "path": "photos/arriere_01.jpg",
+      "replaced_at": "2026-11-09T14:15:16.085059+00:00",
+      "replaced_by": "b0092e998a324d90bca047d60d4d1881",
+      "reason": "capture_restarted"
     },
     {
       "view": "gauche",
       "view_label": "Vue gauche",
       "filename": "gauche_01.jpg",
-      "path": "photos/gauche_01.jpg"
+      "path": "photos/gauche_01.jpg",
+      "replaced_at": "2026-11-09T14:15:16.085059+00:00",
+      "replaced_by": "b0092e998a324d90bca047d60d4d1881",
+      "reason": "capture_restarted"
     },
     {
       "view": "droite",
       "view_label": "Vue droite",
       "filename": "droite_01.jpg",
-      "path": "photos/droite_01.jpg"
+      "path": "photos/droite_01.jpg",
+      "replaced_at": "2026-11-09T14:15:16.085059+00:00",
+      "replaced_by": "b0092e998a324d90bca047d60d4d1881",
+      "reason": "capture_restarted"
     },
     {
       "view": "details",
       "view_label": "Détails dommages",
       "filename": "details_01.jpg",
-      "path": "photos/details_01.jpg"
+      "path": "photos/details_01.jpg",
+      "replaced_at": "2026-11-09T14:15:16.085059+00:00",
+      "replaced_by": "b0092e998a324d90bca047d60d4d1881",
+      "reason": "capture_restarted"
     }
   ],
-  "updated_at": "2026-10-28T10:59:52.136020+00:00",
-  "marque_id": 10,
-  "model_id": 75,
-  "annee": null,
-  "date_sinistre": null
+  "workflow_status": "ready_to_scan"
 }

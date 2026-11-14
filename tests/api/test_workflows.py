@@ -146,7 +146,8 @@ def test_legacy_expertise_reads_without_migration_and_rejects_new_mutations(clie
     before = path.read_bytes()
     detail = client.get("/api/dossiers/DOS-001").json()
     assert detail["type"] == "forfait_expertise"
-    assert detail["workflow_status"] == detail["status"] == "not_analyzed"
+    assert detail["workflow_status"] == "ready_to_scan"
+    assert detail["status"] == "not_analyzed"
     assert client.patch("/api/dossiers/DOS-001", json={"matricule": "14554-C-4578"}).status_code == 409
     assert upload_photo("DOS-001").status_code == 409
     assert path.read_bytes() == before

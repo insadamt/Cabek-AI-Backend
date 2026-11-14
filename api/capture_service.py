@@ -1,7 +1,7 @@
 """Persist and supervise delivery from the single local mock tunnel.
 
 Depends on workflow locks, validated sample bytes, and the existing scan manager.
-Each phase has one durable capture identity; retry resumes missing photographs.
+Expertise retries start a fresh photo set; other workflows retain phase-based recovery.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -52,7 +52,7 @@ class CaptureService:
                     if capture.get("status") == "capturing":
                         with FileLock(str(dossier.directory / ".capture.lock"), timeout=0):
                             self.update_capture(dossier_id, key, status="failed", error_code="capture_interrupted")
-                    elif capture.get("status") == "completed" and dossier.metadata.type == "chiffrage_rapide":
+                    elif capture.get("status") == "completed" and dossier.metadata.type != "verification":
                         self.start_analysis(dossier_id, key)
             except (DossierError, OSError, Timeout):
                 continue
@@ -65,15 +65,35 @@ class CaptureService:
     # IDEMPOTENT CAPTURE ADMISSION
     # ============================================================
 
-    @serialize_dossier
     def start_capture(self, dossier_id: str, phase: str | None) -> None:
+        dossier = self.workflows.repository.read_dossier(dossier_id)
+        self.validate_phase(dossier, phase)
+        capture = dossier.metadata.captures.get(phase or "single", {})
+        if capture.get("status") == "capturing":
+            lock = FileLock(str(dossier.directory / ".capture.lock"))
+            try:
+                lock.acquire(timeout=0)
+            except Timeout:
+
+                # A repeated click follows the live capture without waiting for photo I/O or creating a new attempt.
+
+                return
+            else:
+                lock.release()
+        self.admit_capture(dossier_id, phase)
+
+    @serialize_dossier
+    def admit_capture(self, dossier_id: str, phase: str | None) -> None:
         if self.settings.tunnel_mode != "mock" or self.stopping.is_set():
             raise DossierError(503, "tunnel_unavailable", "Enable CABEK_TUNNEL_MODE=mock for local capture.")
         dossier = self.workflows.repository.read_dossier(dossier_id)
         self.validate_phase(dossier, phase)
         key = phase or "single"
         previous = dossier.metadata.captures.get(key)
-        if previous and previous["status"] == "completed":
+        self.validate_expertise_capture(dossier, previous)
+        if previous and previous["status"] == "completed" and (
+            dossier.metadata.type != "forfait_expertise" or available_photo_records(dossier)
+        ):
             self.validate_saved_capture(dossier, previous)
             self.start_analysis(dossier_id, key)
             return
@@ -90,10 +110,13 @@ class CaptureService:
             with self.workflows.editable_dossier(dossier_id, capture_owned=True) as dossier:
                 metadata = read_json_object(dossier.directory / "metadata.json", "invalid_metadata")
                 previous = metadata.setdefault("captures", {}).get(key)
-                if previous and previous["status"] == "completed":
+                if previous and previous["status"] == "completed" and (
+                    dossier.metadata.type != "forfait_expertise" or available_photo_records(dossier)
+                ):
                     self.validate_saved_capture(dossier, previous)
                     return
                 self.validate_phase(dossier, phase)
+                self.validate_expertise_capture(dossier, previous)
                 before_capture = dossier.metadata.captures.get("before", {})
                 if phase == "after" and before_capture and before_capture.get("status") != "completed":
                     raise DossierError(409, "before_photos_incomplete", "Finish the before capture first.")
@@ -101,12 +124,16 @@ class CaptureService:
                     raise DossierError(409, "before_photos_incomplete", "Complete all four before sides first.")
                 if dossier.metadata.evidence_finalized_at or (phase == "before" and dossier.metadata.before_finalized_at):
                     raise DossierError(409, "evidence_finalized", "This capture phase is immutable.")
+                if dossier.metadata.type == "forfait_expertise":
+                    previous = None
                 capture = previous or {"capture_id": uuid4().hex, "phase": phase,
                                        "samples": self.provider.plan_capture(phase), "created_at": timestamp()}
                 if previous:
                     planned_sources = {sample["source"] for sample in capture["samples"]}
                     capture["samples"].extend(sample for sample in self.provider.plan_capture(phase)
                                               if sample["source"] not in planned_sources)
+                if dossier.metadata.type == "forfait_expertise":
+                    self.archive_replaced_photos(metadata, capture["capture_id"])
                 capture.update(status="capturing", error_code=None)
                 metadata["captures"][key] = capture
                 self.workflows.save_metadata(dossier, metadata)
@@ -126,10 +153,32 @@ class CaptureService:
                 capture_lock.release()
 
     def validate_phase(self, dossier, phase):
-        if dossier.metadata.type == "forfait_expertise":
-            raise DossierError(409, "externally_owned_dossier", "Expertise capture is externally managed.")
         if (dossier.metadata.type == "verification") != (phase is not None):
-            raise DossierError(422, "invalid_photo_phase", "Verification requires a phase; quick estimation has none.")
+            raise DossierError(422, "invalid_photo_phase", "Verification requires a phase; expertise and quick estimation have none.")
+
+    def validate_expertise_capture(self, dossier, capture):
+        if dossier.metadata.type != "forfait_expertise":
+            return
+        capture_id = capture.get("capture_id") if capture else None
+
+        # Existing evidence belongs to its originating inspection and must never be mixed with a new capture.
+
+        if any(not capture_id or photo.capture_id != capture_id
+               for photo in available_photo_records(dossier)):
+            raise DossierError(409, "capture_not_allowed", "This expertise dossier already has a photo set.")
+
+    def archive_replaced_photos(self, metadata, capture_id):
+        photos = metadata.get("photos", [])
+        if photos:
+
+            # Keep superseded evidence on disk, but exclude it from the new scan's active manifest.
+
+            replaced_at = timestamp()
+            metadata.setdefault("photo_history", []).extend({
+                **photo, "replaced_at": replaced_at, "replaced_by": capture_id,
+                "reason": "capture_restarted",
+            } for photo in photos)
+        metadata["photos"] = []
 
     # ============================================================
     # REAL BYTE PUBLICATION AND RESTART-SAFE PHOTO IDENTITIES
@@ -164,7 +213,7 @@ class CaptureService:
                 with dossier_admission(self.workflows.repository, dossier_id):
                     capture_lock.release()
                     if completed and not self.stopping.is_set():
-                        self.start_analysis(dossier_id, key)
+                        self.start_analysis(dossier_id, key, retry_failed=True)
             finally:
                 capture_lock.release()
                 tunnel_lock.release()
@@ -173,7 +222,9 @@ class CaptureService:
         photo_id = hashlib.sha256(f"{capture['capture_id']}:{sample['source']}".encode()).hexdigest()[:32]
         with self.workflows.editable_dossier(dossier_id, capture_owned=True) as dossier:
             metadata = read_json_object(dossier.directory / "metadata.json", "invalid_metadata")
-            previous = next((photo for photo in metadata["photos"] if Path(photo["path"]).stem == photo_id), None)
+            self.validate_expertise_capture(dossier, capture)
+            photos = metadata.setdefault("photos", [])
+            previous = next((photo for photo in photos if Path(photo["path"]).stem == photo_id), None)
             if previous:
                 validate_image(confined_path(dossier.directory, previous["path"]))
                 return
@@ -185,7 +236,7 @@ class CaptureService:
                       "capture_id": capture["capture_id"], "original_filename": Path(sample["source"]).name,
                       "source": sample["source"], "uploaded_at": timestamp()}
             publish_bytes(target, content)
-            metadata["photos"].append(record)
+            photos.append(record)
             try:
                 self.workflows.save_metadata(dossier, metadata)
             except Exception:
@@ -210,20 +261,23 @@ class CaptureService:
             self.workflows.save_metadata(dossier, metadata)
 
     @serialize_dossier
-    def start_analysis(self, dossier_id, key):
+    def start_analysis(self, dossier_id, key, *, retry_failed=False):
         dossier = self.workflows.repository.read_dossier(dossier_id)
-        if dossier.metadata.type != "chiffrage_rapide":
+        if dossier.metadata.type == "verification":
             return
         _, state = self.workflows.repository.read_analysis_state(dossier)
-        if state != "not_analyzed":
+        if state != "not_analyzed" and not (
+            retry_failed and dossier.metadata.type == "forfait_expertise" and state == "failed"
+        ):
             return
+        # Expertise fingerprints the complete metadata file; finish bookkeeping before freezing its inputs.
+
+        self.update_capture(dossier_id, key, analysis_error=None)
         try:
             self.workflows.manager.start_scan(dossier_id)
         except DossierError as error:
             if error.code not in ("scan_in_progress", "already_analyzed"):
                 self.update_capture(dossier_id, key, analysis_error=error.code)
-        else:
-            self.update_capture(dossier_id, key, analysis_error=None)
 
     # ============================================================
     # PUBLIC COUNTS FROM SAVED MANIFEST ENTRIES

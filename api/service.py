@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from api.errors import DossierError
+from api.labor import result_with_labor_hours
 from api.files import confined_path
 from api.repository import DossierRecord, DossierRepository
 from api.schemas import (
@@ -200,7 +201,7 @@ class DossierService:
             for photo in analysis.photos
         ]
         response.result = AnalysisResult(
-            **analysis.model_dump(exclude={"dossier_id", "photos"}),
+            **result_with_labor_hours(analysis),
             photos=photos, report_url=f"{base_url}/report",
         )
         return response

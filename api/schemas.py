@@ -43,6 +43,14 @@ class FinancialBreakdown(BaseModel):
     parts_supply: Money | None
 
 
+class LaborHours(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    repair_labor: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
+    paint_labor: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
+    replacement_labor: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
+
+
 class FinancialResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -51,6 +59,10 @@ class FinancialResult(BaseModel):
     estimated_total: Money | None = Field(description="Full estimate in MAD; null when finances are incomplete.")
     known_subtotal: Money = Field(description="Sum of known financial breakdown amounts in MAD.")
     breakdown: FinancialBreakdown
+    labor_hours: LaborHours = Field(
+        default_factory=LaborHours,
+        description="Total working hours per labor category; null when any contributing duration is unknown.",
+    )
     warnings: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")

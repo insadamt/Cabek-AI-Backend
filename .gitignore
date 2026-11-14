@@ -25,3 +25,7 @@ data/dossiers/.delete-*/
 
 # Backend-owned private photographs used by the simulated tunnel.
 .local/
+
+# Runtime dossier locks belong to local processes, not saved application data.
+data/dossiers/**/.capture.lock
+data/dossiers/**/.metadata.lock

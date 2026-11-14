@@ -1,3 +1,8 @@
+"""Verify scan financial serialization, labor billing, and saved PDF consistency.
+
+Depends on optional scan/report libraries and mocked pricing; no inference runs.
+"""
+
 import io
 from unittest.mock import Mock
 
@@ -27,6 +32,20 @@ def test_known_replacement_labor_survives_missing_part_price():
     assert result.estimated_total is None
     assert result.known_subtotal == 200
     assert result.breakdown.parts_supply is None
+
+
+def test_serialized_finances_include_hours_and_exclude_duplicate_replacement_labor():
+    instances = prepare_invoice_instances([
+        {"cout_detail": {"cout_reparation": 275, "cout_mop": 87.5, "cout_met": 50,
+                         "heures_reparation": 2.5, "heures_mop": 1.25}},
+        replacement(prix_piece=500, heures_mot=3),
+        replacement(prix_piece=500, heures_mot=3),
+    ])
+    result = build_financial(instances)
+    assert result.model_dump()["labor_hours"] == {
+        "repair_labor": 2.5, "paint_labor": 1.25, "replacement_labor": 3,
+    }
+    assert result.estimated_total == 1112.5
 
 
 def test_complete_finances_reconcile_all_five_categories():

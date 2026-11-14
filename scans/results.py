@@ -1,8 +1,15 @@
+"""Serialize billable scan costs and working hours for dossier and part details.
+
+Depends on engine billing decisions, API financial schemas, and pure labor-hour
+aggregation; rejected and blocked detections remain excluded from totals.
+"""
+
 from copy import deepcopy
 import json
 from math import isfinite
 
 from api.schemas import FinancialBreakdown, FinancialResult, StoredAnalysis, Vehicle
+from api.labor import build_labor_hours
 from core.expertise_engine import detection_rejetee
 from scans.contracts import ScanRequest
 
@@ -82,6 +89,7 @@ def build_financial(instances: list[dict]) -> FinancialResult:
         status="incomplete" if warnings else "complete", currency="MAD",
         estimated_total=None if warnings else subtotal, known_subtotal=subtotal,
         breakdown=FinancialBreakdown(**breakdown), warnings=warnings,
+        labor_hours=build_labor_hours(instances),
     )
 
 

@@ -25,8 +25,13 @@ with its existing canonical selection and scan locks. For new categories that
 PUT follows the same edit/finalization rules as PATCH.
 
 Verification never creates AI results, financial estimates, reports, approvals,
-or certifications. Manual uploads do not start a scan. Completed quick tunnel
-capture automatically submits the existing real scan worker.
+or certifications. Manual uploads do not start a scan. Completed expertise and
+quick tunnel capture automatically submit the existing real scan worker.
+Expertise requires an existing selected dossier without usable original photos,
+or a fresh restart of its failed capture. Stale metadata paths to missing originals
+do not block scanning. Failed expertise captures restart all photos under a new
+identity and archive the previous partial manifest. A new capture over an existing
+photo set returns `409 capture_not_allowed`; imported vehicle metadata stays external.
 
 ## Vehicle reference and required inputs
 
@@ -122,7 +127,7 @@ snapshot; clients must use API state during/after asynchronous scanning.
 
 | Category | `workflow_status` | Meaning |
 | --- | --- | --- |
-| Expertise | Existing scan state | `not_analyzed`, `queued`, `processing`, `completed`, `failed` |
+| Expertise | Capture/readiness or analysis state | `awaiting_photos` (including failed captures), `capturing`, `ready_to_scan`, then `queued`, `processing`, `completed`, `failed` |
 | Quick | `draft` | No photos; vehicle inputs incomplete |
 | Local categories | `capturing` / `capture_failed` | Physical capture in progress / failed |
 | Quick | `awaiting_metadata` | Saved photos with missing metadata, or worker waiting after inference |
@@ -330,7 +335,8 @@ Upstream credentials, raw errors, and internal absolute paths are never returned
 | HTTP | Code | Meaning |
 | --- | --- | --- |
 | 404 | `dossier_not_found`, `photo_not_found`, `artifact_not_found`, `report_not_found` | Unknown/unavailable allowlisted resource |
-| 409 | `externally_owned_dossier` | New write route cannot edit expertise inputs |
+| 409 | `externally_owned_dossier` | Local creation/edit/upload/deletion cannot alter externally owned expertise inputs |
+| 409 | `capture_not_allowed` | Expertise already has a photo set outside the resumable capture |
 | 409 | `scan_disabled_for_type` | Verification AI disabled |
 | 409 | `scan_in_progress`, `already_analyzed`, `pricing_in_progress` | Protected photo inputs, completed result, or frozen pricing vehicle |
 | 409 | `before_photos_incomplete` | After collection requires four valid before sides |

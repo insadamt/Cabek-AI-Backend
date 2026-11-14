@@ -39,7 +39,7 @@ def test_existing_legacy_folder_is_not_analyzed(client, create_dossier):
     data = client.get("/api/dossiers/DOS-001/result").json()
     assert data == {
         "dossier_id": "DOS-001", "status": "not_analyzed", "progress": None,
-        "type": "forfait_expertise", "source": "external", "workflow_status": "not_analyzed",
+        "type": "forfait_expertise", "source": "external", "workflow_status": "ready_to_scan",
         "created_at": None, "updated_at": None, "comparison": None,
         "vehicle": {"marque_id": None, "model_id": None, "marque": "Dacia", "modele": "Logan",
                     "matricule": "TEST-123", "annee": None, "date_sinistre": None,

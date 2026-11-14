@@ -38,13 +38,20 @@ def vehicle_is_complete(metadata) -> bool:
 
 def workflow_status(dossier: "DossierRecord", scan_state: str) -> str:
     metadata = dossier.metadata
-    if metadata.type == "forfait_expertise":
+    if metadata.type == "forfait_expertise" and scan_state in ("queued", "processing", "completed"):
         return scan_state
     captures = list(metadata.captures.values())
     if any(capture.get("status") == "capturing" for capture in captures):
         return "capturing"
     if any(capture.get("status") == "failed" for capture in captures):
-        return "capture_failed"
+        return "awaiting_photos" if metadata.type == "forfait_expertise" else "capture_failed"
+    if metadata.type == "forfait_expertise":
+
+        # External manifests can retain deleted photo paths; readiness depends on usable originals.
+
+        if not available_photo_records(dossier):
+            return "awaiting_photos"
+        return "failed" if scan_state == "failed" else "ready_to_scan"
     if metadata.type == "chiffrage_rapide":
         if scan_state in ("queued", "processing"):
             from api.files import read_json_object

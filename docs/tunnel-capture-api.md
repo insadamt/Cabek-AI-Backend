@@ -3,7 +3,7 @@
 This is the frontend integration contract for durable drafts, camera simulation,
 and real AI analysis. It depends on the existing dossier filesystem, FastAPI scan
 queue, three trained YOLO models, and AutoEstimate. Only photograph delivery from
-the physical tunnel is simulated. No frontend repository changes are required.
+the physical tunnel is simulated. Expertise capture requires selecting an externally created dossier before starting the tunnel.
 
 ## Configure and start
 
@@ -47,7 +47,7 @@ For verification, optional `before/` and `after/` directories each contain this
 same layout. If the requested phase directory exists, only its photographs are
 read; otherwise a flat sample directory can be reused for both phases. Side
 identifies camera position; phase identifies capture time. No four-photo limit
-exists. Quick capture needs at least one photograph; verification requires all
+exists. Expertise and quick capture need at least one photograph; verification requires all
 four distinct sides per phase and may save several photographs on each side.
 
 ## Endpoint contract
@@ -60,14 +60,26 @@ scan, report, vehicle, manual upload, and dashboard APIs remain available.
 | `POST /api/dossiers` | `{"type":"chiffrage_rapide"}` or `verification`; optional vehicle fields | `201` existing full dossier detail |
 | `GET /{id}` or `GET /{id}/result` | Saved ID | Current vehicle, workflow, originals, AI progress/result |
 | `PATCH /{id}/metadata` or existing `PATCH /{id}` | Nonempty partial vehicle fields | `200` full detail |
-| `POST /{id}/capture` | Quick: omitted body or `{}`; verification: `{"phase":"before"}` / `after` | `202` capture status, including on duplicate requests |
-| `GET /{id}/capture` | Quick: no query; verification: `?phase=before` / `after` | `200` capture status |
+| `POST /{id}/capture` | Expertise/quick: omitted body or `{}`; verification: `{"phase":"before"}` / `after` | `202` capture status, including on duplicate requests |
+| `GET /{id}/capture` | Expertise/quick: no query; verification: `?phase=before` / `after` | `200` capture status |
 | `POST /{id}/scan` | No body | `202` existing real scan admission/retry |
 
 `POST /api/dossiers` creates the folder and metadata before returning. Type-only
 creation returns `workflow_status: draft`, `status: not_analyzed`, empty vehicle
 names/plate, null vehicle IDs/date, no photos, a unique ID, and UTC creation time.
-`forfait_expertise` remains externally created; new creation/capture/PATCH reject it.
+`forfait_expertise` remains externally created. Creation, metadata PATCH, manual
+uploads, and deletion remain unavailable. Select an existing imported dossier,
+then call its capture endpoint without a phase. A fresh capture requires no usable
+original photographs; stale manifest entries for missing files do not block it.
+Existing photo sets return `409 capture_not_allowed`. After a failed or interrupted
+expertise capture, the next explicit scan starts a new capture identity and takes
+all photos again. Superseded partial photos leave the active manifest and remain
+in `photo_history`. Completed captures with available photos stay idempotent. Imported
+metadata, unknown fields, and omitted legacy type/source fields are preserved.
+
+For the expertise picker, use `GET /api/dossiers?type=forfait_expertise` with
+`workflow_status=awaiting_photos`, plus `search`, `limit`, and `offset`.
+Failed expertise captures return to this same list; there is no separate resume tab. No dossier is created by selection, restoration, or capture.
 
 Send a stable `Idempotency-Key` header on creation, and retain the returned dossier
 ID across refreshes. Repeating that key and the original request returns the same
@@ -121,13 +133,15 @@ No image data is embedded in JSON. Public responses omit source filesystem paths
 
 ## Capture, inference, and completion
 
-1. Persist the draft, then request capture for that ID and phase.
+1. Select the existing expertise dossier, or persist a quick/verification draft; request capture for that ID and its applicable phase.
 2. The provider validates each actual file with the existing bounded decoder:
    extension/content agreement, full decode, single frame, 10 MiB, 20 megapixels.
    It atomically publishes copied bytes before adding their manifest entry.
 3. Capture completes only after the declared images exist and required sides
    validate. Original sample files remain unchanged for repeated testing.
-4. Completed quick capture submits the existing scan manager automatically.
+4. Completed expertise and quick captures submit the existing scan manager automatically.
+   Expertise retains its existing vehicle validation, legacy metadata support, and
+   immutable input snapshot. Capture bookkeeping finishes before that snapshot.
    Manual uploads retain explicit `POST /scan`. Verification never submits AI.
 5. YOLO writes real annotation files, then a private detection checkpoint. Quick
    jobs with missing vehicle values expose `progress.stage: awaiting_metadata`
@@ -145,6 +159,11 @@ models, unavailable catalog, full queue) uses `analysis_error`. A saved capture
 stays `completed` even if AI admission or inference fails. Repeating completed
 capture admission can retry an unstarted scan; retry a failed AI job with
 `POST /scan`. Never repeat dossier creation to recover a capture or AI failure.
+
+Expertise exposes `awaiting_photos`, `capturing`, or `ready_to_scan` before
+analysis; failed captures return to `awaiting_photos`. Active/final analysis
+retains `queued`, `processing`, `completed`, or `failed`. Empty unprocessed dossiers
+show Scanner even when their metadata still lists unavailable original paths.
 
 `status` in dossier detail remains the existing analysis enum. New workflow
 states are `draft`, `capturing`, `capture_failed`, and `awaiting_metadata`; quick
@@ -179,10 +198,12 @@ The existing scan locks, request snapshots, supervision, cleanup, and restart
 recovery remain. The root `.tunnel.lock` protects the one tunnel; `.creation.lock`
 serializes idempotent creation. Hidden files are never served by media endpoints.
 
-Each dossier phase has one durable capture identity. Concurrent/repeated requests
-reuse it. Active capture blocks manual image mutations and scans. Failed capture
-retry skips already registered images, preserves their IDs/bytes, and imports only
-missing/new samples. Restore or repair planned but unsaved source files before
+Concurrent/repeated requests reuse the active capture identity. Active capture
+blocks manual image mutations and scans. Expertise restarts failed capture from
+the beginning with a new identity, new photo IDs, and a fresh source-file plan;
+previous partial photos are archived rather than reused. Quick-estimation and
+verification retries retain their phase identity, skip registered images, and
+import only missing/new samples. Restore or repair planned but unsaved source files before
 retrying; newly added filenames extend the plan on an explicit failed retry.
 Source edits never silently replace already saved evidence. Completed capture
 does not import additional files; use a new dossier for a new quick inspection.
