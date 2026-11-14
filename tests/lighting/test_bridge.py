@@ -48,6 +48,8 @@ class FirmwareSerial:
             self.inject = None
             return len(data)
         command = data.decode()
+        if command in ("\n", "\r", " ", "\t"):
+            return len(data)
         if command == "?":
             self.uptime += 200
             self.frames += 8

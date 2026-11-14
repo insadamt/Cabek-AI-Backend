@@ -1,181 +1,213 @@
-# Local tunnel lighting API
+# Lighting effects API
 
-This reference explains backend-owned ESP32 lighting, its API and readiness
-boundary. It depends on the existing FastAPI capture service, pyserial and the
-unchanged `cabek-dmx-v1` firmware in the sibling `cabek-esp32` repository.
+This guide defines the backend-owned exterior lighting engine, authenticated API,
+configuration and hardware migration. It depends on FastAPI, one pyserial worker,
+the existing capture lifecycle and the sibling `cabek-esp32` firmware repository.
 
-## Ownership and application integration
+## Ownership and hardware compatibility
 
-The inspected application uses FastAPI and React. No Laravel service or existing
-process supervisor was found. One API process owns one persistent serial worker;
-there is no second server or browser-owned lighting state. The existing React
-`startCapture` request reaches `CaptureService.deliver_photos`: immediately before
-photo delivery it enters SCANNING, and only validated, durably published completion
-enters COMPLETED. AI inference/pricing completion is a separate lifecycle and does
-not hold the photo-capture lights red. Existing, already completed capture replays
-and browser refresh/navigation never replay BOOTING or extend the green deadline.
+The existing chain remains CABEK AI → local FastAPI → USB serial → ESP32 → MAX485
+→ RGB DMX decoder → ordinary RGB strip. DMX stays on UART2 TX17, DE25, /RE26,
+250000 baud, 8N2, address 001, channels 1–3. RGB white uses three channels; no W
+wire or physical wiring changes are needed. Lights are outside the photo tunnel.
 
-`python -m api` starts BOOTING before importing the application. Lifespan enters
-INITIALIZING while scan/capture recovery starts. A recurring readiness probe checks:
+`LightingState` remains authoritative. `LightingEngine` chooses one effect and
+renders from monotonic elapsed time; `lighting_effects` and `lighting_pixels` are
+pure functions. `LightingDriver` adapts those frames to `DmxRgbDriver` or an explicit
+`SimulatedPixelDriver`. The existing worker alone owns serial I/O; HTTP requests
+only change desired state. The existing independent readiness worker remains.
+There are no effect-specific threads, timers, command queues or browser events.
+Slow or absent hardware never waits inside a lighting HTTP handler.
 
-- the scan supervisor is available and its recovery thread is alive;
-- the model backend accepts its installed dependencies and model files;
-- dossier storage accepts a temporary write;
-- the configured mock camera provider has valid, readable photograph plans (both
-  before/after directories when configured).
+| Driver/firmware | Available output |
+| --- | --- |
+| `dmx_rgb`, legacy status without `protocol=rgb8-v1` | Existing fixed colors, boot blink, capture red/green/white and `/test`; custom RGB/effects rejected |
+| `dmx_rgb`, confirmed `protocol=rgb8-v1` | Global RGB effects A–L, 8-bit RGB, software brightness, smooth transitions |
+| `simulated_pixels` | All effects in memory, including M–P; no serial port or physical LEDs |
 
-Only a successful probe enters READY. The check repeats every health interval;
-failures leave/re-enter INITIALIZING, except during an active capture or explicit
-OFF. The current repository implements only mock camera delivery: this change
-does not claim physical camera readiness. AutoEstimate pricing is not a capture
-readiness prerequisite; its existing errors/provisional prices remain separate.
-The probe validates installed models through the backend's existing availability
-check; it does not run inference as a readiness test. Hardware availability is
-reported independently and cannot prevent normal application operation.
+Before connection, RGB extension capability is unconfirmed and effect requests
+are rejected explicitly. Loss of connection clears confirmation, keeps requested
+lifecycle/preview state, and retries with bounded backoff. Reconnection negotiates
+again, terminates an interrupted RGB packet with LF, and renders the **current elapsed phase**, rather than replaying obsolete
+frames or restarting startup. A preview still expires during an outage.
 
-## States and transitions
+The 24V NAVIGATE 5050-60D-10MM strip is **unverified hardware**. Its controller IC,
+wiring, grouped addressability, signal level and protocol require investigation.
+No WS2811 driver is installed. The analog RGB decoder cannot address zones. Never
+power the strip from GPIO or enable simulated zone effects on that decoder.
+`pixel_count` currently means logical independent zones in simulation; individual
+physical LED control is never asserted. A zone may later represent a verified
+hardware group. Confirm its protocol and electrical/power requirements first.
 
-| State | Desired output | Exit |
+## Application lifecycle and priorities
+
+| Backend event | RGB-capable effect |
+| --- | --- |
+| Launcher BOOTING | System Awakening, starts off and rises through subtle blue pulses |
+| Lifespan INITIALIZING | Repeating blue breathing |
+| Actual dependencies ready | 800 ms transition to white |
+| Capture admitted | 1200 ms Target Lock, white → orange → red, short pulse |
+| Capture still active | Repeating smooth red pulses |
+| All originals saved and validated | Mission Complete → green, success pulse, hold green |
+| 10 seconds after completion | Transition to white if ready, otherwise initialization effect |
+| Capture fails/interrupted | Slow amber warning; never success green |
+| Graceful shutdown / OFF | Current output → dim blue → off in 1000 ms |
+
+The state enum remains `BOOTING`, `INITIALIZING`, `READY`, `SCANNING`, `COMPLETED`,
+`OFF`. Warning is an effect with the failed lifecycle state, not fabricated
+completion. A new capture, actual state transition or explicit idle READY request
+clears warning. OFF stays off until an authorized transition or actual capture.
+READY requires real provider/models/supervisor/storage readiness. Very fast startup
+can finish before an awakening animation is visible; no fake startup delay is added.
+
+Actual capture events have priority over every preview and decorative effect.
+Capture identities reject overlapping owners and ignore stale/duplicate finishes.
+A new capture cancels the previous completion deadline. Browser reads, refreshes
+and navigation never start or restart lighting. These events describe physical
+photo delivery; the separate AI inference job is not used to fabricate capture
+success. Readiness failures cannot interrupt an active capture's ownership.
+
+Maintenance preview starts only in idle healthy READY, expires after the configured
+preview timeout (even when `repeat=true`), and is replaced atomically. An identical
+active request is idempotent and does not extend its deadline or restart its phase.
+A different request replaces it; `/stop` returns smoothly to lifecycle white.
+Lifecycle changes cancel a preview. Stop/test/state overrides during capture are
+409 conflicts. Stop never aborts a scan or turns capture lights off.
+
+## Configuration and persistence
+
+Install `requirements-api.txt`. Lighting stays opt-in and requires two distinct
+host-only tokens of at least 32 characters. Persist configuration in the existing
+private backend `.env` or systemd environment file and restart after changes;
+process environment takes precedence. Previews and lifecycle events are ephemeral,
+so a process restart performs readiness again instead of replaying saved success.
+Never put lighting tokens in `VITE_*`, source files, URLs or browser storage.
+
+| Environment variable | Default | Limits / purpose |
 | --- | --- | --- |
-| BOOTING | BLUE/OFF, alternating every 500 ms | Actual application lifespan starts initialization |
-| INITIALIZING | BLUE | Required capture services pass checks |
-| READY | WHITE, RGB 255/255/255 | Capture, explicit OFF or lost readiness |
-| SCANNING | RED | This capture succeeds, fails or is interrupted |
-| COMPLETED | GREEN | 10 monotonic seconds after photo success, then READY if healthy; otherwise INITIALIZING |
-| OFF | RGB 0/0/0 | Explicit allowed state request, or a real capture |
+| `CABEK_LIGHTS_ENABLED` | `0` | `1` enables lighting |
+| `CABEK_LIGHTS_DRIVER` | `dmx_rgb` | Only `dmx_rgb` or `simulated_pixels` accepted |
+| `CABEK_LIGHTS_PORT` | `auto` | Explicit `/dev/serial/by-id/...` preferred; auto requires exactly one by-id device |
+| `CABEK_LIGHTS_BAUD` | `115200` | Must match firmware console |
+| `CABEK_LIGHTS_TOKEN` | empty | Control/status bearer token |
+| `CABEK_LIGHTS_MAINTENANCE_TOKEN` | empty | Separate maintenance bearer token |
+| `CABEK_LIGHTS_TIMEOUT` | `1` | Serial response/write timeout, >0 and ≤60 s |
+| `CABEK_LIGHTS_RECONNECT_SECONDS` | `2` | Retry backoff, >0 and ≤60 s |
+| `CABEK_LIGHTS_HEALTH_SECONDS` | `5` | Firmware/application health interval, >0 and ≤60 s |
+| `CABEK_LIGHTS_UPDATE_HZ` | `15` | 1–20 Hz; upper bound respects round-trip serial and ~40 Hz DMX |
+| `CABEK_LIGHTS_PREVIEW_SECONDS` | `30` | 1–120 s automatic preview cutoff |
+| `CABEK_LIGHTS_BRIGHTNESS_LIMIT` | `100` | 0–100% output multiplier / channel ceiling; legacy firmware stays OFF when below 100 |
+| `CABEK_LIGHTS_PIXEL_COUNT` | `60` | 1–1024 logical simulated zones |
+| `CABEK_LIGHTS_PIXEL_MAPPING` | empty | Optional comma-separated permutation of all zone indices |
+| `CABEK_LIGHTS_COLOR_ORDER` | `RGB` | Any permutation of RGB; simulated physical channel mapping only |
 
-Allowed non-idempotent transitions: OFF → BOOTING/INITIALIZING/READY;
-BOOTING → INITIALIZING/OFF; INITIALIZING → READY/OFF;
-READY → SCANNING/INITIALIZING/OFF;
-SCANNING → COMPLETED/READY/INITIALIZING/OFF (internal shutdown only for OFF);
-COMPLETED → SCANNING/READY/INITIALIZING/OFF.
-A real capture may take priority from any startup/maintenance state. While capture
-owns the tunnel, HTTP state changes are rejected except idempotent SCANNING;
-maintenance tests are rejected. SCANNING and COMPLETED can only be entered by the
-capture lifecycle; HTTP accepts only idempotent repeats of these states.
+The brightness limit scales both global output and zone frames. It bounds channel
+levels, not measured watts/current: choose electrical power limits from verified
+strip/controller specifications before future physical pixel implementation.
+A future verified controller plugs into `LightingDriver` with bounded synchronous
+methods on the existing worker; animation logic and HTTP routes remain unchanged.
 
-A failed/canceled/interrupted capture returns to READY if prerequisites remain
-healthy, otherwise INITIALIZING, and never displays success green. A new capture
-cancels a previous completion deadline and any maintenance test. Duplicate finish
-events and stale capture identities have no effect. On application restart the
-existing capture recovery marks interrupted captures failed; lighting starts a
-new readiness cycle and never replays a saved successful capture.
+Use **one API process**, without reload or multiple workers. Close all serial
+monitors/diagnostic scripts before enabling the service. No competing standalone
+serial service should run. The launcher binds `127.0.0.1` by default. Protect **all**
+existing capture routes through the trusted local boundary/authenticated gateway;
+CORS alone is not authentication. Allowed frontend origins accept Authorization.
 
-## Serial reliability and failure behavior
+## HTTP contract
 
-The worker opens the port exclusively once and keeps it open. It holds DTR/RTS low,
-uses configurable 115200-baud console I/O, serializes all writes and blinks using
-existing `2`/`0` commands. No firmware change, reflash, GPIO change or W output is
-needed. DMX remains UART2, 250000 baud, 8N2, address 001, RGB channels 1–3.
+Every endpoint is below `/api/v1/lights` and requires `Authorization: Bearer ...`.
+Control and maintenance tokens may read and request permitted lifecycle states;
+only the maintenance token may start/test/stop previews. No new duplicate routes
+replace the existing `/status`, `/state` or `/test`.
 
-The unchanged command contract is `0` OFF, `1` RED, `2` BLUE, `3` GREEN,
-`4` WHITE, `?` STATUS. Color confirmation requires the exact `OK` response plus
-matching `STATUS`. The parser validates firmware, production DMX mode, baud rates,
-RGB, zero DMX errors, increasing uptime and DMX frame progress. Corrupt, truncated,
-unexpected, mismatched or timed-out responses disconnect the session. Health
-queries occur periodically, without resending an unchanged color. Opening a port
-may still produce an electrical reset on some USB adapters; the worker recovers.
+| Method/path | Result |
+| --- | --- |
+| `GET /status` | 200 desired lifecycle, current rendered frame and separate driver confirmation |
+| `GET /capabilities` | 200 actual negotiated capability flags and caller's `can_preview` permission |
+| `GET /effects` | 200 all 16 effects, compatibility, accepted parameters/defaults/limits |
+| `POST /effects` | 202 accept one validated maintenance preview |
+| `POST /stop` | 202 cancel preview/test and restore lifecycle; optional empty JSON body |
+| `POST /state` | 202 existing authorized transition, e.g. `{"state":"OFF"}` |
+| `POST /test` | 202 existing 3-second fixed-color test, e.g. `{"color":"RED"}` |
 
-After failure, the worker closes the connection, clears current acknowledgment,
-backs off, reopens and queries firmware, then sends the latest desired color.
-This is the retry mechanism; obsolete commands are discarded rather than queued.
-Loss is detected on the next write or health query plus its timeout. A USB outage
-cannot command an unpowered/disconnected ESP32: the last physical output may
-remain until power loss/reconnect. Reconnection reapplies SCANNING if capture is
-still active. A restarted ESP32 starts OFF according to its existing firmware.
-On graceful backend shutdown, capture is interrupted/closed before a best-effort
-OFF; forced termination cannot guarantee OFF. Device-side watchdog behavior would
-require a separate, justified firmware change and is not added here.
+Effects accept only parameters listed for that effect. `color` and `from_color`
+use `#RRGGBB`; `brightness` is 0–100%, `min_brightness` is 0–brightness,
+`duration_ms` is 100–120000, and easing is `linear`, `ease_in`, `ease_out` or
+`ease_in_out`. Unknown fields, irrelevant parameters, invalid ranges, boolean
+numbers and string booleans are rejected. RGB and brightness are independent:
+`color=#FF0000, brightness=50` emits RGB 128,0,0 before any configured limit.
 
-## Configuration
+| Effect | Accepted parameters (defaults shown where useful) |
+| --- | --- |
+| `solid` | color `#2563EB`, brightness `80` |
+| `fade_in`, `fade_out` | color, brightness, duration_ms `2000`, easing `ease_in_out`; fade_out uses current output when color is omitted |
+| `breathing` | color, min_brightness `5`, brightness (maximum), duration_ms (full cycle), repeat `false` |
+| `pulse` | color, brightness (intensity), pulse_duration_ms `500` (100–10000), interval_ms `500` (0–10000), count `3` (1–100), repeat |
+| `transition` | from_color (current rendered output if omitted), color (destination), brightness, duration_ms, easing |
+| `cyber_morph` | duration_ms per blue/cyan/purple leg, brightness, repeat |
+| `system_awakening`, `target_lock`, `mission_complete`, `shutdown` | duration_ms, brightness |
+| `warning` | duration_ms (amber cycle), brightness, repeat |
+| `progressive_reveal` | color, brightness, duration_ms, direction, repeat |
+| `chase`, `scanner_sweep` | color, brightness, speed `2` (0.1–30 zones/s), direction, segment_length `5` (1–1024, ≤zone count), repeat |
+| `rainbow_wave` | brightness, speed, direction, repeat |
 
-Install `requirements-api.txt` (now includes pyserial). Lighting is disabled by
-default; existing local API behavior is retained. Add these to the private backend
-`.env` or the systemd environment file:
+Direction is `forward` or `reverse`. Rainbow speed measures phase travel in zones/s.
+Scanner duration is a round trip; chase includes entrance/exit travel. Non-repeated
+sequences retain their last rendered frame until replaced or preview expiry.
+Finite pulse ends off; finite breathing ends at minimum; reveal retains all zones;
+scanner returns to its initial end; rainbow completes one phase cycle.
+The timeout can intentionally end an effect before its full requested duration.
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `CABEK_LIGHTS_ENABLED` | `0` | Set `1` to enable the bridge |
-| `CABEK_LIGHTS_PORT` | `auto` | Prefer an explicit `/dev/serial/by-id/...`; auto accepts exactly one by-id device |
-| `CABEK_LIGHTS_BAUD` | `115200` | Existing console baud; must match firmware |
-| `CABEK_LIGHTS_TOKEN` | empty | Local status/state bearer credential, at least 32 characters |
-| `CABEK_LIGHTS_MAINTENANCE_TOKEN` | empty | Distinct maintenance credential, at least 32 characters |
-| `CABEK_LIGHTS_TIMEOUT` | `1` | Response/write timeout seconds, positive and ≤60 |
-| `CABEK_LIGHTS_RECONNECT_SECONDS` | `2` | Reconnection retry interval seconds, positive and ≤60 |
-| `CABEK_LIGHTS_HEALTH_SECONDS` | `5` | Hardware and application health interval seconds, positive and ≤60 |
+`status.color` identifies the current desired rendered RGB as a legacy name or hex string;
+`rgb` is current effective output, `brightness` includes the configured limit,
+`active_effect` names the renderer, `preview_active`/`requested_effect` describe the
+logical preview. `pixels` contains logical frames only for zone simulation.
+`simulated=true` explicitly marks memory output; `esp32_available=false` in that
+mode even if the simulator is connected. `acknowledged_rgb` is the last confirmed
+global frame (null for zone frames/disconnection). `synchronized` compares current
+desired output with confirmed output; continuously changing animations may be
+between updates. `capability_error` explains unavailable RGB negotiation.
+`firmware`, `last_seen_at` and `last_successful_command` are historical during
+outages; current acknowledgment clears. **202 means accepted, never observed LED
+output.** Driver confirmation and simulated frames do not prove physical color.
 
-Generate two independent credentials with `python -c 'import secrets;
-print(secrets.token_hex(32))'` (run twice). Keep them off the frontend and out of Git.
-The API uses the existing `.env` loader; process environment takes precedence.
-Do not use PlatformIO Serial Monitor while the bridge owns the device.
-Use one process/worker and omit `--reload` when lighting is enabled.
+Errors keep `{"error":{"code":"...","message":"..."}}`: 401 missing/bad
+credential, 403 maintenance required, 409 ownership/readiness/transition conflict,
+409 `lighting_unsupported_capability`, 422 invalid JSON/parameters/segment length,
+503 lighting disabled. SCANNING/COMPLETED cannot be fabricated through `/state`.
+A hardware outage accepts permitted logical state changes and reports failure.
 
-## HTTP contract and authorization
+## Examples and maintenance panel
 
-The launcher binds to `127.0.0.1`. All lighting endpoints require
-`Authorization: Bearer <control-or-maintenance-token>`. Only the maintenance token
-may use `/test`. No browser credential or CORS authorization exemption is added.
-The existing dossier/capture API remains within its documented trusted local
-boundary; never expose it through an unauthenticated public proxy, since capture
-itself controls hardware. Remote access requires the deployment's authenticated
-application gateway for **all** capture and lighting routes.
-
-- `GET /api/v1/lights/status`: 200, desired state/color/RGB, readiness/error,
-  active capture ID, maintenance-test activity and last transition time.
-  Also `enabled`, `connection_status`, `esp32_available`, `synchronized`,
-  `acknowledged_color`, latest firmware status, `last_successful_command`,
-  `last_error`, and `last_seen_at`.
-- `POST /api/v1/lights/state`, body `{"state":"OFF"}`: 202 on acceptance.
-  Accepts the six state names subject to transition/readiness/capture rules.
-- `POST /api/v1/lights/test`, body `{"color":"RED"}`: 202; maintenance only,
-  idle healthy READY tunnel only. Accepts RED/BLUE/GREEN/WHITE/OFF. Output expires
-  after 3 seconds or is superseded immediately by a capture/state change.
-
-202 means desired state accepted, **not hardware acknowledgment**. `rgb` is desired
-RGB (including the current blink phase); `synchronized` becomes true only after
-serial confirmation of that output. Firmware status and last successful command
-are historical when disconnected; `acknowledged_color` clears on disconnect.
-A response may show `synchronized=false` while a new state is being transmitted.
-These fields prove serial firmware behavior, never physical LED appearance.
-
-Errors use the existing `{"error":{"code":"...","message":"..."}}` envelope:
-401 missing/bad credential; 403 control token used for maintenance; 409 transition,
-readiness or capture conflict; 422 invalid/extra JSON fields; 503 lighting disabled.
-Enabled hardware outages return status normally and accept desired state without
-blocking the application or pretending the ESP32 responded.
-
-## Linux startup and manual API testing
-
-The sibling firmware repo includes `deploy/cabek-tunnel.service` and a full Linux
-installation procedure in `docs/lighting-deployment.md`. It launches the existing
-backend and its embedded bridge together; install and enable it on the tunnel PC.
-The sample uses `/opt/cabek-ai` and port 8000; adapt installation paths to the host.
+Set `LIGHTS_BASE=http://127.0.0.1:8000/api/v1/lights` and provide local tokens via
+shell variables. Use the real deployment address; never save actual secrets.
 
 ```sh
-python -m api --port 8000
-```
-
-In a separate terminal set `LIGHTS_TOKEN` and `LIGHTS_MAINTENANCE_TOKEN` locally.
-`LIGHTS_BASE=http://127.0.0.1:8000/api/v1/lights`. Do not put real credentials into
-saved scripts or browser bundles.
-
-```sh
-curl -i "$LIGHTS_BASE/status"
+curl -sS -H "Authorization: Bearer $LIGHTS_TOKEN" "$LIGHTS_BASE/capabilities"
+curl -sS -H "Authorization: Bearer $LIGHTS_TOKEN" "$LIGHTS_BASE/effects"
+curl -sS -H "Authorization: Bearer $LIGHTS_MAINTENANCE_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"effect":"breathing","color":"#2563EB","duration_ms":2000,"brightness":80,"repeat":true}' \
+  "$LIGHTS_BASE/effects"
+curl -sS -H "Authorization: Bearer $LIGHTS_MAINTENANCE_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"effect":"transition","from_color":"#0000FF","color":"#FF0000","duration_ms":1500,"easing":"ease_in_out"}' \
+  "$LIGHTS_BASE/effects"
+# Zone simulation only; this returns 409 on global RGB hardware.
+curl -sS -H "Authorization: Bearer $LIGHTS_MAINTENANCE_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"effect":"chase","color":"#00AAFF","speed":2,"segment_length":5,"direction":"forward","repeat":true}' \
+  "$LIGHTS_BASE/effects"
+curl -sS -X POST -H "Authorization: Bearer $LIGHTS_MAINTENANCE_TOKEN" "$LIGHTS_BASE/stop"
 curl -sS -H "Authorization: Bearer $LIGHTS_TOKEN" "$LIGHTS_BASE/status"
-curl -i -H "Authorization: Bearer $LIGHTS_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"color":"RED"}' "$LIGHTS_BASE/test"
-curl -i -H "Authorization: Bearer $LIGHTS_MAINTENANCE_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"color":"RED"}' "$LIGHTS_BASE/test"
-curl -i -H "Authorization: Bearer $LIGHTS_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"state":"OFF"}' "$LIGHTS_BASE/state"
-curl -i -H "Authorization: Bearer $LIGHTS_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"state":"READY"}' "$LIGHTS_BASE/state"
 ```
 
-Expect 401, then 200, then 403; test is 202 only when healthy/idle. Observe desired
-and acknowledged values separately. Use the **existing** React capture action or
-`tunnel-capture-api.md` curl flow to start real capture; fabricating SCANNING or
-COMPLETED through this API is intentionally rejected. Check red throughout photo
-delivery, green after every required original is validated, then white after
-10 seconds. Also check a new capture during green, failure/cancellation, browser
-refresh, missing services, USB reconnection and backend/ESP32 restart.
+Open `/maintenance/lights` in the existing React app, authenticate with the
+maintenance token, and select supported effects/color/brightness/duration. Controls
+are shown only after server authorization; the backend enforces that permission on
+every write. The panel uses existing base surfaces/buttons and French labels.
+It polls reads once per second without overlapping requests, displays connection
+and capability restrictions, and shows logical zone swatches only in simulation.
+Login/refresh/logout never issues an effect or lifecycle command. Logout drops the
+in-memory credential; an existing preview expires server-side or can be stopped
+before logout. The API must still have its real capture dependencies ready.
+
+See [firmware migration and manual acceptance](../../cabek-esp32/docs/lighting-effects.md)
+and [Linux service installation](../../cabek-esp32/docs/lighting-deployment.md).

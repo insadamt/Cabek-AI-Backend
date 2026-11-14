@@ -8,7 +8,9 @@ import logging
 from threading import Event, Thread
 import time
 
-from api.lighting_protocol import SerialLightingLink
+from api.lighting_protocol import COLORS, SerialLightingLink
+from api.lighting_drivers import DmxRgbDriver, SimulatedPixelDriver
+from api.lighting_engine import LightingEngine
 from api.lighting_state import LightingState, timestamp
 
 
@@ -20,6 +22,13 @@ class LightingService:
         self.settings = settings
         self.state = LightingState(clock)
         self.link = link or SerialLightingLink(settings)
+        self.driver = (SimulatedPixelDriver(settings) if settings.driver == "simulated_pixels"
+                       else DmxRgbDriver(self.link))
+        self.engine = LightingEngine(self.state, settings)
+        self.acknowledged_output = None
+        self.acknowledged_rgb = None
+        self.next_frame = 0
+        self.sent_revision = None
         self.clock = clock
         self.stop_event = Event()
         self.thread = None
@@ -58,15 +67,17 @@ class LightingService:
     def run(self):
         try:
             while not self.stop_event.is_set():
+                began = time.monotonic()
                 self.synchronize()
-                self.stop_event.wait(0.025)
+                elapsed = time.monotonic() - began
+                self.stop_event.wait(max(0, 1 / self.settings.update_hz - elapsed))
         finally:
 
             # Shutdown OFF is best effort; unplugged hardware must not hold up exit.
 
             try:
                 if self.connected:
-                    self.link.set_color("OFF")
+                    self.driver.set_global_color((0, 0, 0), 100)
             except Exception:
                 logger.warning("Could not acknowledge shutdown OFF")
             self.disconnect()
@@ -101,31 +112,46 @@ class LightingService:
             return
         try:
             if not self.connected:
-                status = self.link.connect()
+                status = self.driver.connect()
                 self.record_status(status)
                 with self.state.lock:
                     self.connected = True
                     self.acknowledged_color = None
-                logger.info("Lighting ESP32 connected")
-            color = self.state.desired_color()
-            if color != self.acknowledged_color:
-                status = self.link.set_color(color)
+                    self.acknowledged_output = None
+                    self.acknowledged_rgb = None
+                    self.next_frame = 0
+                logger.info("Lighting driver connected: %s", self.settings.driver)
+            with self.state.lock:
+                frame = self.engine.render(self.driver.get_capabilities())
+                rendered_revision = self.state.revision
+            output = frame.pixels if frame.pixels is not None else frame.output_rgb
+            if output != self.acknowledged_output and (now >= self.next_frame or self.sent_revision != self.state.revision):
+                status = (self.driver.set_pixels(frame.pixels) if frame.pixels is not None
+                          else self.driver.set_global_color(frame.color, frame.brightness))
+                color = self.color_name(frame.output_rgb)
+                self.sent_revision = rendered_revision
                 with self.state.lock:
                     self.acknowledged_color = color
+                    self.acknowledged_output = output
+                    self.acknowledged_rgb = frame.output_rgb if frame.pixels is None else None
                     self.last_successful_command = {
                         "command": status["command"], "color": color, "acknowledged_at": timestamp(),
                     }
                 self.record_status(status)
+                self.next_frame = now + 1 / self.settings.update_hz
                 self.next_health = self.clock() + self.settings.health_seconds
             elif now >= self.next_health:
-                status = self.link.query_status()
+                status = self.driver.get_status()
                 self.record_status(status)
-                expected_command = self.last_successful_command["command"]
-                if status["command"] != expected_command:
+                expected_rgb = ','.join(map(str, self.acknowledged_rgb)) if self.acknowledged_rgb is not None else None
+                if status["command"] != self.last_successful_command["command"] or (
+                        expected_rgb is not None and status["rgb"] != expected_rgb):
 
-                    # A reboot or external console command must never silently replace the desired state.
+                    # External commands invalidate confirmation until the current frame is replayed.
 
                     self.acknowledged_color = None
+                    self.acknowledged_output = None
+                    self.acknowledged_rgb = None
                 self.next_health = self.clock() + self.settings.health_seconds
         except Exception as error:
             message = f"{type(error).__name__}: {error}"
@@ -137,6 +163,11 @@ class LightingService:
             self.disconnect()
             self.next_connect = self.clock() + self.settings.reconnect_seconds
 
+    @staticmethod
+    def color_name(output):
+        return next((name for name, (_, value) in COLORS.items() if value == output),
+                    '#' + ''.join(f'{channel:02X}' for channel in output))
+
     def record_status(self, status):
         with self.state.lock:
             self.firmware = status.copy()
@@ -145,17 +176,21 @@ class LightingService:
 
     def disconnect(self):
         try:
-            self.link.close()
+            self.driver.disconnect()
         except Exception:
             logger.warning("Could not close lighting serial port")
         with self.state.lock:
             self.connected = False
             self.acknowledged_color = None
+            self.acknowledged_output = None
+            self.acknowledged_rgb = None
 
     def close(self):
         with self.state.lock:
             self.state.capture_id = None
             self.state.transition("OFF")
+        if self.thread is not None and self.thread.is_alive() and self.connected:
+            self.stop_event.wait(1.1)
         self.stop_event.set()
         if self.thread is not None:
             self.thread.join(timeout=self.settings.timeout * 3 + 2)
@@ -165,11 +200,22 @@ class LightingService:
     def status(self):
         with self.state.lock:
             snapshot = self.state.snapshot()
+            frame = self.engine.render(self.driver.get_capabilities())
+            output = frame.pixels if frame.pixels is not None else frame.output_rgb
+            snapshot.update(color=self.color_name(frame.output_rgb), rgb=frame.output_rgb,
+                            capability_error=(None if self.driver.get_capabilities()['supports_smooth_transitions']
+                                              else 'RGB extension not confirmed; effects require protocol=rgb8-v1.'),
+                            brightness=frame.brightness, active_effect=self.engine.active_effect,
+                            preview_active=self.engine.preview is not None,
+                            simulated=self.settings.driver == "simulated_pixels",
+                            pixels=frame.pixels, requested_effect=(self.engine.preview.model_dump(
+                                exclude_unset=True) if self.engine.preview else None),
+                            acknowledged_rgb=self.acknowledged_rgb)
             return {**snapshot, "enabled": self.settings.enabled,
                     "connection_status": "connected" if self.connected else (
                         "disconnected" if self.settings.enabled else "disabled"),
-                    "esp32_available": self.connected,
-                    "synchronized": self.connected and self.acknowledged_color == snapshot["color"],
+                    "esp32_available": self.connected and self.settings.driver == "dmx_rgb",
+                    "synchronized": self.connected and self.acknowledged_output == output,
                     "acknowledged_color": self.acknowledged_color,
                     "firmware": self.firmware, "last_successful_command": self.last_successful_command,
                     "last_error": self.last_error, "last_seen_at": self.last_seen_at}

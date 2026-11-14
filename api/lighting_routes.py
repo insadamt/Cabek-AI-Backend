@@ -14,11 +14,16 @@ from pydantic import BaseModel, ConfigDict
 from api.errors import DossierError
 from api.schemas import ErrorResponse
 from api.lighting_schemas import LightingStatus
+from api.lighting_effects import EffectRequest, effect_catalog
 
 
 class StateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     state: Literal["BOOTING", "INITIALIZING", "READY", "SCANNING", "COMPLETED", "OFF"]
+
+
+class StopRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
 
 class TestRequest(BaseModel):
@@ -63,4 +68,34 @@ def test_color(payload: TestRequest, request: Request, maintenance: bool = Depen
     if not maintenance:
         raise DossierError(403, "lighting_maintenance_required", "A maintenance bearer token is required.")
     request.app.state.lighting.state.start_test(payload.color)
+    return request.app.state.lighting.status()
+
+
+@router.get("/capabilities")
+def get_capabilities(request: Request, maintenance: bool = Depends(authorize)):
+    return {**request.app.state.lighting.driver.get_capabilities(), "can_preview": maintenance}
+
+
+@router.get("/effects")
+def get_effects(request: Request):
+    return effect_catalog(request.app.state.lighting.driver.get_capabilities())
+
+
+def require_maintenance(maintenance):
+    if not maintenance:
+        raise DossierError(403, "lighting_maintenance_required", "A maintenance bearer token is required.")
+
+
+@router.post("/effects", status_code=202, response_model=LightingStatus)
+def start_effect(payload: EffectRequest, request: Request, maintenance: bool = Depends(authorize)):
+    require_maintenance(maintenance)
+    service = request.app.state.lighting
+    service.engine.start_preview(payload, service.driver.get_capabilities())
+    return service.status()
+
+
+@router.post("/stop", status_code=202, response_model=LightingStatus)
+def stop_effect(request: Request, payload: StopRequest | None = None, maintenance: bool = Depends(authorize)):
+    require_maintenance(maintenance)
+    request.app.state.lighting.engine.stop_preview()
     return request.app.state.lighting.status()

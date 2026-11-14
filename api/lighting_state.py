@@ -33,6 +33,8 @@ class LightingState:
         self.lock = RLock()
         self.clock = clock
         self.state = "OFF"
+        self.revision = 0
+        self.warning = False
         self.transitioned_at = timestamp()
         self.entered_at = clock()
         self.ready = False
@@ -48,6 +50,8 @@ class LightingState:
         if state not in TRANSITIONS[self.state]:
             raise DossierError(409, "lighting_transition_conflict", "Invalid lighting transition.")
         self.state = state
+        self.revision += 1
+        self.warning = False
         self.entered_at = self.clock()
         self.transitioned_at = timestamp()
         self.completion_deadline = self.clock() + 10 if state == "COMPLETED" else None
@@ -74,6 +78,9 @@ class LightingState:
                 raise DossierError(409, "lighting_capture_required", "Only actual capture events can enter this state.")
             if state == "READY" and not self.ready:
                 raise DossierError(409, "lighting_not_ready", "Required application services are unavailable.")
+            if state == self.state and self.warning:
+                self.warning = False
+                self.revision += 1
             self.transition(state)
 
     def begin_capture(self, capture_id):
@@ -96,11 +103,13 @@ class LightingState:
                 return
             self.capture_id = None
             self.transition("COMPLETED" if successful else ("READY" if self.ready else "INITIALIZING"))
+            self.warning = not successful
 
     def start_test(self, color):
         with self.lock:
             if self.capture_id or self.state != "READY" or not self.ready:
                 raise DossierError(409, "lighting_test_conflict", "Maintenance testing requires an idle ready tunnel.")
+            self.revision += 1
             self.test_color = color
             self.test_deadline = self.clock() + 3
 
@@ -120,7 +129,7 @@ class LightingState:
     def snapshot(self):
         with self.lock:
             color = self.desired_color()
-            return {"state": self.state, "color": color, "rgb": COLORS[color][1],
+            return {"revision": self.revision, "warning": self.warning, "state": self.state, "color": color, "rgb": COLORS[color][1],
                     "ready": self.ready, "readiness_error": self.readiness_error,
                     "active_capture_id": self.capture_id, "test_active": self.test_color is not None,
                     "last_transition_at": self.transitioned_at}

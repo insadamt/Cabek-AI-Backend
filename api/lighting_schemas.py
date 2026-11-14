@@ -15,13 +15,13 @@ LightingColor = Literal["OFF", "RED", "BLUE", "GREEN", "WHITE"]
 
 class SuccessfulCommand(BaseModel):
     command: str
-    color: LightingColor
+    color: str
     acknowledged_at: datetime
 
 
 class LightingStatus(BaseModel):
     state: Literal["BOOTING", "INITIALIZING", "READY", "SCANNING", "COMPLETED", "OFF"]
-    color: LightingColor
+    color: str
     rgb: tuple[int, int, int]
     ready: bool
     readiness_error: str | None
@@ -32,8 +32,16 @@ class LightingStatus(BaseModel):
     connection_status: Literal["connected", "disconnected", "disabled"]
     esp32_available: bool
     synchronized: bool
-    acknowledged_color: LightingColor | None
+    acknowledged_color: str | None
     firmware: dict[str, str] | None
     last_successful_command: SuccessfulCommand | None
     last_error: str | None
     last_seen_at: datetime | None
+    brightness: float
+    active_effect: str | None
+    preview_active: bool
+    requested_effect: dict | None
+    simulated: bool
+    pixels: tuple[tuple[int, int, int], ...] | None
+    acknowledged_rgb: tuple[int, int, int] | None
+    capability_error: str | None

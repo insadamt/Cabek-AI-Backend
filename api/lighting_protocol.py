@@ -1,4 +1,4 @@
-"""Maintain one exclusive serial session using the unchanged cabek-dmx-v1 protocol.
+"""Maintain one exclusive serial session using negotiated, backward-compatible firmware capabilities.
 
 Depends on optional pyserial and the existing ASCII OK/STATUS responses. Only the
 lighting worker calls this transport; acknowledgment cannot prove visible LEDs.
@@ -45,6 +45,10 @@ class SerialLightingLink:
         self.buffer.clear()
         self.previous_status = None
         self.port.reset_input_buffer()
+
+        # Terminate a packet left by a disconnected writer; legacy firmware ignores LF.
+
+        self.write("\n")
         return self.query_status(startup=True)
 
     def close(self):
@@ -67,7 +71,7 @@ class SerialLightingLink:
                 line = raw.decode("ascii").strip()
                 if line.startswith(prefix):
                     return line
-                if startup and line.startswith(("BOOT ", "READY ")):
+                if startup and line.startswith(("BOOT ", "READY ", "ERR RGB", "OK R RGB ")):
                     continue
                 raise OSError("Unexpected serial response or ESP32 restart.")
             self.buffer.extend(self.port.read(512))
@@ -76,7 +80,7 @@ class SerialLightingLink:
         raise TimeoutError("ESP32 response timed out.")
 
     def write(self, command):
-        if self.port.write(command.encode("ascii")) != 1:
+        if self.port.write(command.encode("ascii")) != len(command):
             raise OSError("Incomplete serial write.")
 
     def query_status(self, *, startup=False):
@@ -84,7 +88,12 @@ class SerialLightingLink:
         line = self.read_until("STATUS ", startup=startup)
         try:
             status = dict(item.split("=", 1) for item in line.split()[1:])
-            expected = next(rgb for command, rgb in COLORS.values() if command == status["command"])
+            output = tuple(map(int, status["rgb"].split(",")))
+            extended = status.get("protocol") == "rgb8-v1" and status["command"] == "R"
+            expected = output if extended else next(
+                rgb for command, rgb in COLORS.values() if command == status["command"])
+            if len(output) != 3 or any(not 0 <= channel <= 255 for channel in output):
+                raise ValueError("Invalid RGB channels")
             valid = (status["firmware"] == "cabek-dmx-v1" and status["mode"] == "dmx_tx"
                      and status["uart2_baud"] == "250000" and int(status["errors"]) == 0
                      and abs(int(status["uart0_baud"]) - self.settings.baud) <= 12
@@ -110,4 +119,16 @@ class SerialLightingLink:
         status = self.query_status()
         if status["command"] != command:
             raise OSError("ESP32 did not retain the acknowledged color.")
+        return status
+
+
+    def set_rgb(self, rgb):
+        if not self.previous_status or self.previous_status.get("protocol") != "rgb8-v1":
+            raise OSError("Firmware does not advertise smooth RGB capability.")
+        self.write("R " + " ".join(map(str, rgb)) + "\n")
+        if self.read_until("OK ") != "OK R RGB " + " ".join(map(str, rgb)):
+            raise OSError("ESP32 RGB acknowledgment does not match the requested output.")
+        status = self.query_status()
+        if tuple(map(int, status["rgb"].split(","))) != rgb or status["command"] != "R":
+            raise OSError("ESP32 did not retain the acknowledged RGB output.")
         return status
