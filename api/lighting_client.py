@@ -3,7 +3,7 @@
 Depends only on stdlib HTTP and the existing readiness probe. Two bounded workers
 keep network/readiness I/O outside capture requests; no serial or effects run here.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 import logging
 import os
@@ -23,7 +23,6 @@ class NoRedirect(HTTPRedirectHandler):
 class LightingSettings:
     enabled: bool = False
     url: str = 'http://127.0.0.1:8001'
-    token: str = field(default='', repr=False)
     timeout: float = 1
     health_seconds: float = 5
 
@@ -34,14 +33,11 @@ class LightingSettings:
             raise ValueError('Configure a direct lighting API URL without credentials/query/fragment.')
         if not 0 < self.timeout <= 10 or not 0 < self.health_seconds <= 60:
             raise ValueError('Lighting client intervals are out of range.')
-        if self.enabled and len(self.token) < 32:
-            raise ValueError('A server-side lighting control token is required.')
 
     @classmethod
     def from_environment(cls):
         return cls(enabled=os.getenv('CABEK_LIGHTS_ENABLED','0') == '1',
                    url=os.getenv('CABEK_LIGHTS_API_URL','http://127.0.0.1:8001'),
-                   token=os.getenv('CABEK_LIGHTS_TOKEN',''),
                    timeout=float(os.getenv('CABEK_LIGHTS_TIMEOUT','1')),
                    health_seconds=float(os.getenv('CABEK_LIGHTS_HEALTH_SECONDS','5')))
 
@@ -126,8 +122,7 @@ class LightingClient:
     def send_snapshot(self, snapshot):
         request = Request(self.settings.url.rstrip('/') + '/api/v1/lights/events',
                           data=json.dumps(snapshot).encode(), method='POST',
-                          headers={'Authorization':'Bearer ' + self.settings.token,
-                                   'Content-Type':'application/json'})
+                          headers={'Content-Type':'application/json'})
         opener = build_opener(ProxyHandler({}), NoRedirect())
         with opener.open(request, timeout=self.settings.timeout) as response:
             if response.status != 202:

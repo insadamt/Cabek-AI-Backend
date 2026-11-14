@@ -32,7 +32,7 @@ def test_slow_network_never_blocks_capture_and_shutdown_publishes_off():
         if len(sent)==1:
             entered.set()
             assert release.wait(2)
-    client=LightingClient(LightingSettings(enabled=True,token='c'*32),send=send)
+    client=LightingClient(LightingSettings(enabled=True),send=send)
     client.start()
     try:
         assert entered.wait(1)
