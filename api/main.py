@@ -1,7 +1,7 @@
 """Configure the local FastAPI integration and shared dossier/scan services.
 
 Depends on configured file storage and optional model workers; write endpoints
-share scan locks inside the trusted local boundary; lighting events are sent to the separate ESP32 API.
+share scan locks inside the trusted local boundary; lighting commands are sent to the separate ESP32 API.
 """
 
 import asyncio
@@ -33,7 +33,6 @@ from api.upload_limits import UploadLimitMiddleware
 from api.capture_service import CaptureService
 from api.capture_routes import router as capture_router
 from api.lighting_client import LightingClient
-from api.lighting_readiness import check_capture_readiness
 
 
 # ============================================================
@@ -49,11 +48,10 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         lighting.start()
-        lighting.initialize()
         try:
             await asyncio.to_thread(manager.start)
             await asyncio.to_thread(application.state.capture_service.start)
-            lighting.set_readiness_probe(lambda: check_capture_readiness(manager, application.state.capture_service))
+            lighting.application_ready()
             yield
         finally:
             try:
@@ -76,7 +74,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.state.lighting = lighting
     application.state.vehicle_catalog = VehicleCatalog()
     application.state.workflow_service = WorkflowService(manager, application.state.vehicle_catalog)
-    application.state.capture_service = CaptureService(application.state.workflow_service, settings, lighting.state)
+    application.state.capture_service = CaptureService(application.state.workflow_service, settings, lighting)
     application.add_middleware(UploadLimitMiddleware)
     application.add_exception_handler(DossierError, handle_dossier_error)
     application.add_exception_handler(RequestValidationError, handle_validation_error)

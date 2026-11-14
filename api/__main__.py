@@ -1,4 +1,4 @@
-"""Launch the local API and start BOOTING before importing application services.
+"""Launch the local API and send startup lighting before importing application services.
 
 Depends on Uvicorn and the optional lighting bridge. Lighting deployments use one
 process with a stable configured port; the legacy development launcher keeps reload.
