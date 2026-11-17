@@ -256,3 +256,52 @@ boundaries remain as documented in [dossier-workflows-api.md](dossier-workflows-
 
 Tests and manual acceptance checks are in
 [tunnel-capture-implementation-report.md](tunnel-capture-implementation-report.md).
+
+## Interior white lighting (Shelly Plus 1PM)
+
+The backend alone controls Shelly; its URL must never be placed in Vite settings.
+Environment-loaded startup defaults to verification enabled and rejects a missing
+`CABEK_INTERNAL_LIGHTS_URL`. Set `CABEK_INTERNAL_LIGHTS_ENABLED=false` explicitly
+for a hardware-free setup. Direct `ApiSettings` construction defaults to disabled
+for isolated tests. See `.env.example` for switch ID (0), HTTP timeout (3 seconds),
+stabilization (500 ms), and optional `CABEK_INTERNAL_LIGHTS_MIN_POWER_W`.
+Numeric settings must be finite; timeout is positive and at most 30 seconds,
+stabilization is 0–30000 ms, and minimum power is nonnegative.
+
+After acquiring capture and tunnel locks, the worker POSTs `Switch.Set`, GETs
+`Switch.GetStatus`, requires `output=true`, and waits the stabilization interval
+before reading photographs. If a calibrated minimum power is supplied, `apower`
+must be a finite numeric measurement strictly above it. No threshold is guessed.
+Relay-only verification cannot guarantee physical LED illumination. Commission
+with an electrician/operator and measure the real healthy load before configuring
+this threshold. Automated tests mock the device and never switch hardware.
+
+Lights remain on for the entire photograph sequence. OFF is attempted before
+releasing tunnel ownership; failures are logged without changing capture success.
+There is no delayed interior cleanup. Exterior RGB lifecycle remains independent;
+lighting failures request `warning`, repeated at brightness 100, without allowing
+RGB errors to replace the original capture error.
+
+Lighting failures persist `status=failed`, `error_code`, and a French
+`error_message`: `internal_lighting_unavailable`,
+`internal_lighting_not_confirmed`, or `internal_lighting_power_low`.
+No photographs are taken, metadata is retained, and POST capture retries normally.
+Admission remains asynchronous (202); poll capture status for worker failures.
+
+The frontend should use `stage=lighting_preparing` for « Préparation de
+l'éclairage… », `lighting_ready` for « Éclairage prêt », and `capturing` for
+« Capture en cours… ». On lighting failure show « Éclairage indisponible » or
+« Éclairage insuffisant » for low power, the existing warning icon and retry action,
+and stop progress animation. Keep `error_message` in scan controls after the Island
+dismisses. Stages may pass between polls; do not manufacture photo progress.
+This repository contains no React/Dynamic Island or central settings frontend.
+
+Local maintenance endpoints reuse loopback-client and local-Origin restrictions:
+`GET /api/settings/internal-lights/status`, `POST /api/settings/internal-lights/on`,
+and `POST /api/settings/internal-lights/off`. Responses expose only `output`,
+`apower`, `voltage`, and `current`. Both commands acquire the tunnel lock and return
+409 while capture owns it. Disabled devices receive no HTTP requests. Interior
+maintenance does not require exterior RGB to be enabled.
+
+Run backend tests in hardware-free mode:
+`CABEK_INTERNAL_LIGHTS_ENABLED=false .venv/bin/python -m pytest tests -q`.

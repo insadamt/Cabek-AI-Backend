@@ -38,12 +38,16 @@ def require_local_settings(request: Request):
 
         if not allowed_origin:
             raise DossierError(403, 'local_settings_only', 'Hardware settings require a local browser origin.')
+
+
+def require_exterior_settings(request: Request):
+    require_local_settings(request)
     if not request.app.state.lighting.settings.enabled:
         raise DossierError(503, 'lighting_disabled', 'Lighting control is disabled on the backend.')
 
 
 router = APIRouter(prefix='/api/settings/lights', tags=['Local settings'],
-                   dependencies=[Depends(require_local_settings)])
+                   dependencies=[Depends(require_exterior_settings)])
 
 
 def forward_test(request, path, payload=None):
@@ -88,3 +92,30 @@ def startup(request: Request):
 def ready(request: Request):
     request.app.state.lighting.application_ready()
     return {'success': True}
+
+
+internal_router = APIRouter(prefix='/api/settings/internal-lights', tags=['Local settings'],
+                            dependencies=[Depends(require_local_settings)])
+
+
+@internal_router.get('/status')
+def internal_status(request: Request):
+    return request.app.state.internal_lighting.status()
+
+
+@internal_router.post('/{command}')
+def internal_command(command: str, request: Request):
+    from filelock import FileLock, Timeout
+
+    if command not in ('on', 'off'):
+        raise DossierError(422, 'invalid_request', 'Commande inconnue.')
+    root = request.app.state.workflow_service.repository.dossiers_dir
+    try:
+        # Share camera ownership so maintenance cannot switch a live capture off.
+
+        with FileLock(str(root / '.tunnel.lock'), timeout=0):
+            lights = request.app.state.internal_lighting
+            lights.set_output(command == 'on')
+            return lights.status()
+    except Timeout as error:
+        raise DossierError(409, 'tunnel_busy', 'Une capture est en cours.') from error

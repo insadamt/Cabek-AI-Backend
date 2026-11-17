@@ -15,6 +15,7 @@ from uuid import uuid4
 
 from filelock import FileLock, Timeout
 
+from api.internal_lighting import InternalLighting, MESSAGES
 from api.capture_schemas import CaptureStatus, CapturedPhoto
 from api.errors import DossierError
 from api.dossier_lifecycle import dossier_admission, serialize_dossier
@@ -34,6 +35,7 @@ class CaptureService:
             raise ValueError("Only disabled and mock tunnel modes are supported.")
         if not isfinite(settings.mock_photo_delay_seconds) or settings.mock_photo_delay_seconds < 0:
             raise ValueError("Camera delivery delay must be finite and nonnegative.")
+        self.internal_lighting = InternalLighting(settings.internal_lighting)
         self.lighting = lighting
         self.workflows = workflows
         self.settings = settings
@@ -134,7 +136,7 @@ class CaptureService:
                                               if sample["source"] not in planned_sources)
                 if dossier.metadata.type == "forfait_expertise":
                     self.archive_replaced_photos(metadata, capture["capture_id"])
-                capture.update(status="capturing", error_code=None)
+                capture.update(status="capturing", error_code=None, stage="lighting_preparing")
                 metadata["captures"][key] = capture
                 self.workflows.save_metadata(dossier, metadata)
             self.executor.submit(self.deliver_photos, dossier_id, key, capture, capture_lock, tunnel_lock)
@@ -186,9 +188,16 @@ class CaptureService:
 
     def deliver_photos(self, dossier_id, key, capture, capture_lock, tunnel_lock):
         completed = False
+        code = None
         try:
             if self.lighting is not None:
                 self.lighting.begin_capture(capture["capture_id"])
+            self.internal_lighting.activate_and_verify()
+            self.update_capture(dossier_id, key, stage="lighting_ready")
+            if self.internal_lighting.settings.enabled and self.stopping.wait(
+                    self.internal_lighting.settings.stabilization_ms / 1000):
+                raise DossierError(503, "capture_interrupted", "Capture interrupted.")
+            self.update_capture(dossier_id, key, stage="capturing")
             for sample in capture["samples"]:
                 if self.stopping.is_set():
                     raise DossierError(503, "capture_interrupted", "Capture interrupted.")
@@ -197,18 +206,30 @@ class CaptureService:
                     raise DossierError(503, "capture_interrupted", "Capture interrupted.")
             dossier = self.workflows.repository.read_dossier(dossier_id)
             self.validate_saved_capture(dossier, capture)
-            self.update_capture(dossier_id, key, status="completed", error_code=None)
+            self.update_capture(dossier_id, key, status="completed", error_code=None, stage="completed")
             completed = True
         except Exception as error:
             logger.exception("Capture %s failed", capture["capture_id"])
             code = error.code if isinstance(error, DossierError) else "capture_failed"
-            self.update_capture(dossier_id, key, status="failed", error_code=code)
+            self.update_capture(dossier_id, key, status="failed", error_code=code, stage="failed")
         finally:
+            # Cleanup completes under tunnel ownership before any newer capture can begin.
+
+            self.internal_lighting.cleanup()
             if self.lighting is not None:
-                self.lighting.finish_capture(
-                    capture["capture_id"], completed and not self.stopping.is_set(),
-                    awaiting_analysis=completed and dossier.metadata.type != "verification",
-                )
+                try:
+                    self.lighting.finish_capture(
+                        capture["capture_id"], completed and not self.stopping.is_set(),
+                        awaiting_analysis=completed and dossier.metadata.type != "verification",
+                    )
+                except Exception:
+                    logger.warning("Exterior capture completion failed", exc_info=True)
+
+            if not completed and code in MESSAGES and self.lighting is not None:
+                try:
+                    self.lighting.set_effect('warning', repeat=True, brightness=100)
+                except Exception:
+                    logger.warning("Exterior lighting warning failed", exc_info=True)
 
             # Hold stable admission across releasing camera ownership and queuing AI.
 
@@ -308,4 +329,5 @@ class CaptureService:
         return CaptureStatus(dossier_id=dossier_id, phase=phase, capture_id=capture.get("capture_id"),
                              status=capture.get("status", "not_started"), expected_count=len(capture.get("samples", [])),
                              saved_count=len(photos), photos=photos, error_code=capture.get("error_code"),
-                             analysis_error=capture.get("analysis_error"))
+                             analysis_error=capture.get("analysis_error"), stage=capture.get("stage"),
+                             error_message=MESSAGES.get(capture.get("error_code")))

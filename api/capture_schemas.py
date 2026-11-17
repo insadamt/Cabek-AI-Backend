@@ -32,3 +32,5 @@ class CaptureStatus(BaseModel):
     photos: list[CapturedPhoto] = Field(default_factory=list)
     error_code: str | None = None
     analysis_error: str | None = None
+    stage: str | None = None
+    error_message: str | None = None

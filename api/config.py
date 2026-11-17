@@ -10,6 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from api.lighting_client import LightingSettings
+from api.internal_lighting import InternalLightingSettings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,7 @@ class ApiSettings:
     mock_photos_dir: Path | None = None
     mock_photo_delay_seconds: float = 0
 
+    internal_lighting: InternalLightingSettings = field(default_factory=InternalLightingSettings)
     lighting: LightingSettings = field(default_factory=LightingSettings)
 
     @classmethod
@@ -44,6 +46,7 @@ class ApiSettings:
         default_root = Path(__file__).resolve().parents[1] / "data" / "dossiers"
         return cls(
             lighting=LightingSettings.from_environment(),
+            internal_lighting=InternalLightingSettings.from_environment(),
             dossiers_dir=Path(os.environ.get("CABEK_DOSSIERS_DIR", default_root)),
             models_dir=Path(os.environ.get("CABEK_MODELS_DIR", default_root.parents[1] / "models")),
             scan_timeout_seconds=float(os.environ.get("CABEK_SCAN_TIMEOUT_SECONDS", "1800")),

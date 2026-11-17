@@ -33,7 +33,7 @@ from api.upload_limits import UploadLimitMiddleware
 from api.capture_service import CaptureService
 from api.capture_routes import router as capture_router
 from api.lighting_client import LightingClient
-from api.settings_routes import router as settings_router
+from api.settings_routes import router as settings_router, internal_router
 
 
 # ============================================================
@@ -76,6 +76,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.state.vehicle_catalog = VehicleCatalog()
     application.state.workflow_service = WorkflowService(manager, application.state.vehicle_catalog)
     application.state.capture_service = CaptureService(application.state.workflow_service, settings, lighting)
+    application.state.internal_lighting = application.state.capture_service.internal_lighting
     application.add_middleware(UploadLimitMiddleware)
     application.add_exception_handler(DossierError, handle_dossier_error)
     application.add_exception_handler(RequestValidationError, handle_validation_error)
@@ -97,6 +98,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(workflow_router)
     application.include_router(capture_router)
     application.include_router(settings_router)
+    application.include_router(internal_router)
     return application
 
 
