@@ -74,3 +74,20 @@ def test_rejects_remote_browser_origin_but_allows_local_settings(settings_api):
     assert client.post('/api/settings/lights/off', headers={'Origin': 'https://outside.example'}).status_code == 403
     lighting.send_manual_command.assert_not_called()
     assert client.post('/api/settings/lights/off', headers={'Origin': 'http://localhost:5173'}).status_code == 202
+
+
+def test_browser_startup_and_ready_use_automatic_lifecycle(settings_api):
+    client, lighting = settings_api
+    assert client.post('/api/settings/lights/startup').status_code == 200
+    assert lighting.prepare_command()[2] == {
+        'effect': 'system_awakening', 'duration_ms': 5000, 'repeat': True,
+    }
+    assert client.post('/api/settings/lights/ready').status_code == 200
+    assert lighting.prepare_command()[2]['effect'] == 'system_awakening'
+    ready_at = lighting.startup_minimum_deadline
+    lighting.clock = lambda: ready_at
+    assert lighting.prepare_command()[2]['color'] == '#FFFFFF'
+    lighting.begin_analysis('active-job')
+    client.post('/api/settings/lights/startup')
+    client.post('/api/settings/lights/ready')
+    assert lighting.prepare_command()[2]['color'] == '#FF0000'

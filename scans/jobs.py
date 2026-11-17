@@ -37,9 +37,10 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 class ScanManager:
-    def __init__(self, settings: ApiSettings, backend: ScanBackend | None = None):
+    def __init__(self, settings: ApiSettings, backend: ScanBackend | None = None, lighting=None):
         if not isfinite(settings.scan_timeout_seconds) or settings.scan_timeout_seconds <= 0 or settings.scan_max_pending < 1:
             raise ValueError("Scan timeout and queue capacity must be positive.")
+        self.lighting = lighting
         self.settings = settings
         self.repository = DossierRepository(settings.dossiers_dir)
         self.backend = backend or ModelProcessBackend()
@@ -117,8 +118,12 @@ class ScanManager:
                 # Release the child lock before launching; retain the admission lock for supervision.
 
                 try:
+                    if self.lighting is not None:
+                        self.lighting.begin_analysis(job.request.run_id)
                     self.executor.submit(self.run_job, job)
                 except RuntimeError as error:
+                    if self.lighting is not None:
+                        self.lighting.finish_analysis(job.request.run_id, False)
                     save_job_status(job, "failed", "scan_interrupted")
                     raise DossierError(503, "worker_unavailable", "The scan worker is unavailable.") from error
             return DossierResult(
@@ -144,10 +149,13 @@ class ScanManager:
             raise DossierError(409, "scan_disabled_for_type", "AI analysis is disabled for verification dossiers.")
 
     def run_job(self, job: ScanJob) -> None:
+        successful = False
         try:
-            execute_job(job, self.backend, self.repository, self.stopping, self.settings.scan_timeout_seconds)
+            successful = execute_job(job, self.backend, self.repository, self.stopping, self.settings.scan_timeout_seconds)
         finally:
             self.capacity.release()
+            if self.lighting is not None:
+                self.lighting.finish_analysis(job.request.run_id, successful)
 
     def prepare_analysis_directory(self, dossier_dir: Path) -> Path:
         analysis_dir = confined_path(dossier_dir, "analysis")

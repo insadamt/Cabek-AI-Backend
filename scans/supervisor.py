@@ -68,7 +68,7 @@ def terminate_worker(process: subprocess.Popen) -> None:
 def execute_job(
     job: ScanJob, backend: ScanBackend, repository: DossierRepository,
     stopping: Event, timeout_seconds: float,
-) -> None:
+) -> bool:
     process = None
     failure_code = "scan_failed"
     try:
@@ -100,6 +100,7 @@ def execute_job(
         # Files are already in analysis/; only a verified successful worker establishes completion.
 
         save_job_status(job, "completed")
+        return True
     except Exception:
         if stopping.is_set():
             failure_code = "scan_interrupted"
@@ -111,6 +112,7 @@ def execute_job(
 
         (job.request.output_dir / "result.json").unlink(missing_ok=True)
         save_job_status(job, "failed", failure_code)
+        return False
     finally:
         if process is not None:
             terminate_worker(process)

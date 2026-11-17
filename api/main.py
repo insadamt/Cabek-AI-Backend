@@ -43,8 +43,8 @@ from api.settings_routes import router as settings_router
 def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | None = None,
                lighting: LightingClient | None = None) -> FastAPI:
     settings = settings or ApiSettings.from_environment()
-    manager = ScanManager(settings, scan_backend)
     lighting = lighting or LightingClient(settings.lighting)
+    manager = ScanManager(settings, scan_backend, lighting=lighting)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):

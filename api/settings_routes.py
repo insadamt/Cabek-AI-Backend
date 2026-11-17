@@ -76,3 +76,15 @@ def set_lights(payload: dict, request: Request):
 @router.post('/off')
 def off(request: Request):
     return forward_test(request, '/off')
+
+
+@router.post('/startup')
+def startup(request: Request):
+    request.app.state.lighting.begin_startup()
+    return {'success': True}
+
+
+@router.post('/ready')
+def ready(request: Request):
+    request.app.state.lighting.application_ready()
+    return {'success': True}

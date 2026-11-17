@@ -205,7 +205,10 @@ class CaptureService:
             self.update_capture(dossier_id, key, status="failed", error_code=code)
         finally:
             if self.lighting is not None:
-                self.lighting.finish_capture(capture["capture_id"], completed and not self.stopping.is_set())
+                self.lighting.finish_capture(
+                    capture["capture_id"], completed and not self.stopping.is_set(),
+                    awaiting_analysis=completed and dossier.metadata.type != "verification",
+                )
 
             # Hold stable admission across releasing camera ownership and queuing AI.
 
@@ -278,6 +281,8 @@ class CaptureService:
         except DossierError as error:
             if error.code not in ("scan_in_progress", "already_analyzed"):
                 self.update_capture(dossier_id, key, analysis_error=error.code)
+                if self.lighting is not None:
+                    self.lighting.analysis_rejected()
 
     # ============================================================
     # PUBLIC COUNTS FROM SAVED MANIFEST ENTRIES

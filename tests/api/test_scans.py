@@ -1,3 +1,7 @@
+"""Verify queued scan lifecycle, artifact validation and lighting completion using isolated worker processes.
+
+Depends on temporary dossiers and the fixture backend; no model inference or hardware is used.
+"""
 import json
 from pathlib import Path
 import subprocess
@@ -188,3 +192,25 @@ def test_restart_recovers_only_unlocked_managed_jobs(storage, create_dossier):
         assert response["status"] == "failed"
         assert response["error"]["code"] == "scan_interrupted"
         assert response["progress"]["stage"] == "failed"
+
+
+@pytest.mark.parametrize('mode, successful', [('success', True), ('late_failure', False)])
+def test_lighting_finishes_only_after_validated_worker(storage, create_dossier, mode, successful):
+    from threading import Event
+    from unittest.mock import Mock
+    from api.lighting_client import LightingClient, LightingSettings
+
+    create_dossier()
+    finished = Event()
+    lighting = LightingClient(LightingSettings())
+    lighting.begin_analysis = Mock(wraps=lighting.begin_analysis)
+    lighting.finish_analysis = Mock(side_effect=lambda *args: finished.set())
+    app = create_app(ApiSettings(storage), FixtureBackend(mode), lighting=lighting)
+    with TestClient(app) as client:
+        assert client.post('/api/dossiers/DOS-001/scan').status_code == 202
+        assert lighting.prepare_command()[2]['color'] == '#FF0000'
+        data, _ = wait_for_terminal(client)
+        assert finished.wait(1)
+        run_id = lighting.begin_analysis.call_args.args[0]
+        lighting.finish_analysis.assert_called_once_with(run_id, successful)
+        assert (data['status'] == 'completed') == successful

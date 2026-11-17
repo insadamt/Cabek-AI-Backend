@@ -450,7 +450,7 @@ loopback client and `CABEK_LIGHTS_ENABLED=1`; they forward to the independent
 lighting service configured by server-side `CABEK_LIGHTS_API_URL`.
 
 SET fields and upstream 200/202/409/422/501/503 results follow the
-[lighting contract](../../cabek-esp32/docs/lighting-api.md). Unreachable hardware
+[lighting contract](../../cabek-esp32/docs/api.md). Unreachable hardware
 or service returns 503; malformed/redirected upstream replies return 502. Disabled
 lighting returns 503; non-local clients return 403. Preserve local-only access in
 reverse proxies; Vite enforces the same boundary before forwarding.
@@ -460,3 +460,22 @@ commands. They share serialized HTTP delivery with automatic effects, and failed
 manual tests are reported to the caller rather than retried later. Capture
 requests remain independent of network latency; new captures continue to choose
 their automatic lighting. The browser never contacts the serial service directly.
+
+
+`POST /api/settings/lights/startup` and `POST /api/settings/lights/ready` have no
+body and return `200 {"success": true}` when the lifecycle signal is accepted.
+They use the same local-client and lighting-enabled checks. They enqueue automatic
+lighting state without waiting for hardware delivery; they do not confirm visual
+output. Startup repeats `system_awakening` with a 5000 ms cycle and holds for at
+least four seconds. The browser sends ready only after its retained 3D scene has
+rendered a prepared frame and shared fonts/artwork have settled. The resources
+remain in memory across navigation until app teardown; reload begins a fresh
+session. Failed 3D preparation offers retry or dossier access without the studio.
+
+Startup/ready signals cannot override active capture or analysis. Expertise and
+quick estimation stay red through photo delivery, AI admission, metadata waiting,
+pricing and output validation. Validated success fades to green for ten seconds,
+then back to white. Capture or AI failure fades to amber. Verification has no AI
+stage and signals success after valid capture. Color changes use the lighting
+API's `transition` effect with `duration_ms: 900` and `easing: ease_in_out`, starting
+from its current output. Manual tests also cancel a pending startup-ready timer.

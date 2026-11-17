@@ -9,7 +9,7 @@ Le tunnel local simulé importe de vraies photos et déclenche les modèles exis
 Configuration et parcours complet : [docs/tunnel-capture-api.md](docs/tunnel-capture-api.md).
 
 Le contrôle local ESP32 est intégré au cycle de capture côté backend :
-[API et configuration éclairage](../cabek-esp32/docs/lighting-api.md). Le frontend réutilise son
+[API et configuration éclairage](../cabek-esp32/docs/api.md). Le frontend réutilise son
 appel de capture existant ; aucun jeton matériel ne doit être publié au navigateur.
 
 ## API FastAPI
@@ -76,4 +76,10 @@ Le modèle `best_zone_critique.pt` est utilisé par le moteur pour intersecter l
 Lighting APIs and USB ownership live in `cabek-esp32`. This application only sends
 direct `POST /api/lights/set` and `POST /api/lights/off` commands using
 `CABEK_LIGHTS_API_URL`. CABEK AI schedules the return to white ten seconds after
-success; lighting requests do not require capture readiness checks.
+validated AI completion; photo capture alone does not trigger success for expertise
+or quick estimation. Verification retains capture-based success because it has no
+AI stage. Automatic color changes use 900 ms eased transitions. Browser startup
+prepares the retained 3D studio and shared artwork, with at least four seconds of
+loading, before signaling readiness through the local lifecycle endpoints described
+in [docs/api.md](docs/api.md#local-hardware-settings). Lighting requests do not
+require capture readiness checks.

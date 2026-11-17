@@ -14,20 +14,20 @@ def test_application_events_map_to_new_contract_and_completion_is_owned_here():
     now = [0.0]
     client = LightingClient(LightingSettings(), clock=lambda: now[0])
     client.application_ready()
-    assert client.prepare_command()[1:] == ('/set', {'effect': 'solid', 'color': '#FFFFFF'})
+    assert client.prepare_command()[1:] == ('/set', {'effect': 'transition', 'color': '#FFFFFF', 'duration_ms': 900, 'easing': 'ease_in_out'})
     client.begin_capture('first')
-    assert client.prepare_command()[2] == {'effect': 'pulse', 'color': '#FF0000', 'repeat': True}
+    assert client.prepare_command()[2] == {'effect': 'transition', 'color': '#FF0000', 'duration_ms': 900, 'easing': 'ease_in_out'}
     client.finish_capture('first', True)
     now[0] = 9
-    assert client.prepare_command()[2] == {'effect': 'mission_complete'}
+    assert client.prepare_command()[2] == {'effect': 'transition', 'color': '#00FF49', 'duration_ms': 900, 'easing': 'ease_in_out'}
     now[0] = 10
-    assert client.prepare_command()[2] == {'effect': 'solid', 'color': '#FFFFFF'}
+    assert client.prepare_command()[2] == {'effect': 'transition', 'color': '#FFFFFF', 'duration_ms': 900, 'easing': 'ease_in_out'}
     client.begin_capture('second')
     now[0] = 100
     client.finish_capture('first', True)
-    assert client.prepare_command()[2]['effect'] == 'pulse'
+    assert client.prepare_command()[2]['color'] == '#FF0000'
     client.finish_capture('second', False)
-    assert client.prepare_command()[2] == {'effect': 'warning'}
+    assert client.prepare_command()[2] == {'effect': 'transition', 'color': '#FF9800', 'duration_ms': 900, 'easing': 'ease_in_out'}
 
 
 def test_slow_http_never_blocks_capture_and_shutdown_sends_off():
@@ -43,11 +43,11 @@ def test_slow_http_never_blocks_capture_and_shutdown_sends_off():
     try:
         assert entered.wait(1)
         client.begin_capture('capture-while-network-blocked')
-        assert client.prepare_command()[2]['effect'] == 'pulse'
+        assert client.prepare_command()[2]['color'] == '#FF0000'
     finally:
         release.set()
         client.close()
-    assert sent[0] == ('/set', {'effect': 'system_awakening'})
+    assert sent[0] == ('/set', {'effect': 'system_awakening', 'duration_ms': 5000, 'repeat': True})
     assert sent[-1] == ('/off', None)
     assert not client.worker.is_alive()
 
@@ -130,5 +130,59 @@ def test_new_capture_during_manual_delivery_remains_the_latest_command():
     client.send = send
     client.send_manual_command('/off', None)
     assert client.capture_id == 'new'
-    assert client.prepare_command()[2] == {'effect': 'pulse', 'color': '#FF0000', 'repeat': True}
+    assert client.prepare_command()[2] == {'effect': 'transition', 'color': '#FF0000', 'duration_ms': 900, 'easing': 'ease_in_out'}
     assert client.sent_revision != client.revision
+
+
+def test_green_waits_for_ai_and_cannot_be_overridden_by_startup():
+    now = [0.0]
+    client = LightingClient(LightingSettings(), clock=lambda: now[0])
+    client.begin_capture('photos')
+    client.finish_capture('photos', True, awaiting_analysis=True)
+    assert client.completion_deadline is None
+    assert client.prepare_command()[2]['color'] == '#FF0000'
+    client.application_ready()
+    client.begin_startup()
+    assert client.prepare_command()[2]['color'] == '#FF0000'
+    client.begin_analysis('job')
+    now[0] = 30
+    assert client.prepare_command()[2]['color'] == '#FF0000'
+    client.finish_analysis('stale-job', True)
+    assert client.completion_deadline is None
+    client.finish_analysis('job', True)
+    assert client.prepare_command()[2]['color'] == '#00FF49'
+    assert client.completion_deadline == 40
+    now[0] = 40
+    assert client.prepare_command()[2]['color'] == '#FFFFFF'
+
+
+def test_failure_and_queued_jobs_never_signal_early_success():
+    client = LightingClient(LightingSettings())
+    client.begin_analysis('one')
+    client.begin_analysis('two')
+    client.finish_analysis('one', True)
+    assert client.prepare_command()[2]['color'] == '#FF0000'
+    client.finish_analysis('two', False)
+    assert client.prepare_command()[2]['color'] == '#FF9800'
+    assert client.completion_deadline is None
+    client.begin_capture('capture')
+    client.finish_capture('capture', True, awaiting_analysis=True)
+    client.analysis_rejected()
+    assert client.prepare_command()[2]['color'] == '#FF9800'
+    assert not client.awaiting_analysis
+
+
+def test_startup_animation_has_a_minimum_hold_and_capture_cancels_pending_white():
+    now = [0.0]
+    client = LightingClient(LightingSettings(), clock=lambda: now[0])
+    client.begin_startup()
+    client.application_ready()
+    now[0] = 3.9
+    assert client.prepare_command()[2]['effect'] == 'system_awakening'
+    now[0] = 4
+    assert client.prepare_command()[2]['color'] == '#FFFFFF'
+    client.begin_startup()
+    client.application_ready()
+    client.begin_capture('new')
+    now[0] = 20
+    assert client.prepare_command()[2]['color'] == '#FF0000'

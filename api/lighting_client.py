@@ -1,7 +1,7 @@
 """Send direct lighting commands without blocking CABEK AI capture requests.
 
 Depends on stdlib HTTP and one worker. CABEK AI alone owns the ten-second return
-from successful capture to white; the lighting service receives no lifecycle data.
+from validated AI completion to white; the lighting service receives no lifecycle data.
 """
 from dataclasses import dataclass
 import json
@@ -51,6 +51,10 @@ class LightingClient:
         self.command_lock = Lock()
         self.sent_revision = -1
         self.capture_id = None
+        self.analysis_ids = set()
+        self.awaiting_analysis = False
+        self.startup_minimum_deadline = None
+        self.ready_deadline = None
         self.completion_deadline = None
         self.path = '/off'
         self.payload = None
@@ -71,29 +75,80 @@ class LightingClient:
         with self.lock:
             if not self.settings.enabled or self.worker is not None:
                 return
-            self.set_effect('system_awakening')
+            self.begin_startup()
             self.worker = Thread(target=self.run, daemon=True, name='lighting-http')
             self.worker.start()
 
+    def transition_to(self, color):
+        self.set_effect('transition', color=color, duration_ms=900, easing='ease_in_out')
+
+    def begin_startup(self):
+        with self.lock:
+            if self.capture_id is not None or self.analysis_ids or self.awaiting_analysis:
+                return
+            self.completion_deadline = None
+            self.startup_minimum_deadline = self.clock() + 4
+            self.ready_deadline = None
+            self.set_effect('system_awakening', duration_ms=5000, repeat=True)
+
     def application_ready(self):
-        self.set_effect(color='#FFFFFF')
+        with self.lock:
+            if self.capture_id is None and not self.analysis_ids and not self.awaiting_analysis:
+                if self.startup_minimum_deadline is not None and self.clock() < self.startup_minimum_deadline:
+                    self.ready_deadline = self.startup_minimum_deadline
+                    return
+                self.ready_deadline = None
+                self.startup_minimum_deadline = None
+                self.transition_to('#FFFFFF')
 
     def begin_capture(self, capture_id):
         with self.lock:
+            self.ready_deadline = None
             self.capture_id = capture_id
             self.completion_deadline = None
-            self.set_effect('pulse', color='#FF0000', repeat=True)
+            self.transition_to('#FF0000')
 
-    def finish_capture(self, capture_id, successful):
+    def finish_capture(self, capture_id, successful, awaiting_analysis=False):
         with self.lock:
             if capture_id != self.capture_id:
                 return
             self.capture_id = None
-            self.completion_deadline = self.clock() + 10 if successful else None
-            self.set_effect('mission_complete' if successful else 'warning')
+            if successful and awaiting_analysis:
+                self.awaiting_analysis = True
+                return
+            self.finish_activity(successful)
+
+    def begin_analysis(self, run_id):
+        with self.lock:
+            self.awaiting_analysis = False
+            self.ready_deadline = None
+            self.analysis_ids.add(run_id)
+            self.completion_deadline = None
+            self.transition_to('#FF0000')
+
+    def finish_analysis(self, run_id, successful):
+        with self.lock:
+            if run_id not in self.analysis_ids:
+                return
+            self.analysis_ids.remove(run_id)
+            self.finish_activity(successful)
+
+    def analysis_rejected(self):
+        with self.lock:
+            self.awaiting_analysis = False
+            self.finish_activity(False)
+
+    def finish_activity(self, successful):
+        if self.capture_id is not None or self.analysis_ids or self.awaiting_analysis:
+            return
+        self.completion_deadline = self.clock() + 10 if successful else None
+        self.transition_to('#00FF49' if successful else '#FF9800')
 
     def prepare_command(self):
         with self.lock:
+            if self.ready_deadline is not None and self.clock() >= self.ready_deadline:
+                self.ready_deadline = None
+                self.application_ready()
             if self.completion_deadline is not None and self.clock() >= self.completion_deadline:
                 self.completion_deadline = None
                 self.application_ready()
@@ -123,6 +178,7 @@ class LightingClient:
                 # Preserve a newer capture event that arrived during the manual HTTP request.
 
                 if self.revision == previous_revision:
+                    self.ready_deadline = None
                     self.completion_deadline = None
                     self.path, self.payload = path, payload
                     self.revision += 1
@@ -153,6 +209,9 @@ class LightingClient:
             if self.worker is None:
                 return
             self.capture_id = None
+            self.analysis_ids.clear()
+            self.awaiting_analysis = False
+            self.ready_deadline = None
             self.completion_deadline = None
             self.path, self.payload = '/off', None
             self.revision += 1
