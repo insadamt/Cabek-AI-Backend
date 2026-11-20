@@ -1,14 +1,75 @@
-# Persistent drafts and simulated tunnel API
+# Persistent drafts, Tiandy cameras and demo capture
 
 This is the frontend integration contract for durable drafts, camera simulation,
 and real AI analysis. It depends on the existing dossier filesystem, FastAPI scan
-queue, three trained YOLO models, and AutoEstimate. Only photograph delivery from
-the physical tunnel is simulated. Expertise capture requires selecting an externally created dossier before starting the tunnel.
+queue, three trained YOLO models, AutoEstimate, and the separate Tiandy API.
+Expertise capture requires selecting an externally created dossier before starting the tunnel.
+
+## Tiandy and demonstration cameras
+
+The sibling `../Tiandy_CABEK_API` service provides named channels using API v2.1.0.
+Create its own virtual environment, install its `requirements.txt`, configure its
+private `.env`, and run `.venv/bin/python camera_api.py`. It uses port 8001, one
+worker and no reload. RGB remains on its separately configured port (9001 on this installation).
+Never copy the archived virtual environment or place credentials in Vite.
+
+Install `requirements-cameras.txt` into the existing Cabek Global API environment.
+Set `CABEK_TUNNEL_MODE=tiandy`, `CABEK_TIANDY_API_URL` and
+`CABEK_TIANDY_API_KEY` on Cabek Global. Restart the API after environment changes.
+Tiandy's `CAMERA_API_KEY` and Cabek's `CABEK_TIANDY_API_KEY` must match.
+The Tiandy process is only required when using physical cameras.
+
+`GET/PATCH /api/settings/operation` includes persistent `demo_mode` and `slow_mode`.
+PATCH accepts either or both strict booleans; empty/null updates are rejected.
+Legacy settings files default demo mode from `CABEK_TUNNEL_MODE=mock`; `tiandy`
+defaults to physical cameras unless a persisted preference overrides it.
+`disabled` remains a hard stop regardless of the preference. This installation
+starts with persisted demo mode enabled. Settings exit does not reset preferences.
+Lighting remains controlled by its existing configuration in both source modes.
+
+`GET /api/cameras` returns `source` (`demo`, `tiandy`, `disabled`) and thirteen
+read-only camera identities, readiness and Cabek-owned preview URLs. Optional
+`phase=before|after` selects demonstration evidence for that verification phase.
+Cabek proxies `/api/cameras/{channel}/stream` and `/latest.jpg`; only the backend
+supplies the upstream `X-API-Key`. Streams are not buffered and close on disconnect
+or bounded upstream timeout. Existing trusted-local deployment restrictions remain.
+
+Essential channels are 4/front, 13/rear, 14/left and 10/right. Optional zoom channels
+are 1/rear, 2/front, 5/left, 6/front, 7/right, 8/right, 11/left and 12/rear.
+Channel 3/Centre is diagnostic-only. Physical-camera display names come from
+Tiandy; demo names use the same commissioned registry without contacting Tiandy.
+
+Capture accepts `{"zoom_channels":[1,12]}` and verification additionally requires
+`"phase":"before"` or `"after"`. Omitted zooms mean four essentials in Tiandy
+mode; legacy `mock` calls without `zoom_channels` retain their previous file-based
+semantics. The frontend always supplies the new selection, including an empty list.
+Reject duplicate, unknown, essential and diagnostic channels in zoom selections.
+
+Each modern capture plans exactly four essentials plus selected zooms and freezes
+source, camera names and slow mode at admission. After lighting stabilizes, read
+baseline frame IDs and require subsequent snapshots to advance. Validate age,
+content type, full decoding and existing image limits. All planned photographs
+must succeed before AI admission. Errors identify the unavailable camera; no
+automatic fallback to demo or partial AI submission occurs.
+
+Real-camera retries create a fresh complete current-phase attempt, preserving the
+old partial evidence in `photo_history` and leaving the other verification phase
+untouched. Source or zoom-selection changes on failed attempts also start fresh.
+Active/completed requests remain idempotent; AI retries use saved originals.
+Capture status includes `capture_source`, `zoom_channels` and `error_message`.
+Camera photos include `camera_channel`, `camera_name`, `camera_role`,
+`capture_source`, and `frame_id`; legacy photo responses omit absent camera fields.
+Representative verification slots prefer essentials while retaining all zooms.
+
+Demo reads the existing confined side samples, preferring phase directories when
+present. One source per side supplies the essential image; the two side zooms use
+the left and right image halves without enlargement. Preview and capture use the
+same crop operation. Demo evidence is explicitly labeled and does not require Tiandy.
 
 ## Configure and start
 
 ```bash
-pip install -r requirements-api.txt -r requirements-scan.txt
+pip install -r requirements-cameras.txt  # Additional transport for an installed API environment.
 export CABEK_TUNNEL_MODE=mock
 export CABEK_MOCK_PHOTOS_DIR=/absolute/path/to/sample-photos
 export CABEK_MOCK_PHOTO_DELAY_SECONDS=0.3
@@ -23,7 +84,7 @@ image detection do not need AutoEstimate. Selecting IDs and beginning quick
 pricing require the live catalog. Missing part quotes remain unknown amounts.
 
 `CABEK_TUNNEL_MODE` defaults to `disabled`; capture then returns `503
-tunnel_unavailable`. Only `disabled` and `mock` are currently implemented. Delivery
+tunnel_unavailable`. Supported values are `disabled`, `mock`, and `tiandy`. Delivery
 delay must be finite and nonnegative; it does not control inference or pricing.
 Run one API process for this local prototype, with one tunnel and one model worker.
 
@@ -47,7 +108,7 @@ For verification, optional `before/` and `after/` directories each contain this
 same layout. If the requested phase directory exists, only its photographs are
 read; otherwise a flat sample directory can be reused for both phases. Side
 identifies camera position; phase identifies capture time. No four-photo limit
-exists. Expertise and quick capture need at least one photograph; verification requires all
+exists. Legacy mock expertise and quick capture need at least one photograph; modern camera captures require four essentials. Verification requires all
 four distinct sides per phase and may save several photographs on each side.
 
 ## Endpoint contract

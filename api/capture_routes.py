@@ -1,4 +1,4 @@
-"""Expose mock tunnel admission and durable per-phase camera progress.
+"""Expose Tiandy/demo tunnel admission and durable per-phase camera progress.
 
 Depends on CaptureService; response photo URLs use the existing media allowlist.
 """
@@ -19,7 +19,8 @@ router = APIRouter(prefix="/api/dossiers", tags=["Tunnel capture"], responses={
 @router.post("/{dossier_id}/capture", response_model=CaptureStatus, status_code=202)
 def start_capture(dossier_id: DossierId, request: Request, payload: CaptureRequest = CaptureRequest()):
     captures = request.app.state.capture_service
-    captures.start_capture(dossier_id, payload.phase)
+    zooms = payload.zoom_channels if 'zoom_channels' in payload.model_fields_set else None
+    captures.start_capture(dossier_id, payload.phase, zooms)
     return captures.read_status(dossier_id, payload.phase, request.scope.get("root_path", ""))
 
 

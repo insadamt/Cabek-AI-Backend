@@ -6,7 +6,7 @@ Depends on Pydantic and shared workflow contracts; saved financial semantics sta
 from math import isclose
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, model_serializer
 from api.workflow_schemas import DossierType, PhotoPhase, PhotoSide, WorkflowStatus
 
 
@@ -117,7 +117,25 @@ class StoredAnalysis(BaseModel):
 # FRONTEND RESULT CONTRACT
 # ============================================================
 
-class OriginalPhoto(BaseModel):
+class CameraPhotoIdentity(BaseModel):
+    camera_channel: int | None = None
+    camera_name: str | None = None
+    camera_role: str | None = None
+    capture_source: str | None = None
+    frame_id: str | None = None
+
+    @model_serializer(mode='wrap')
+    def omit_absent_camera_identity(self, handler):
+        result = handler(self)
+        # Existing clients retain the exact legacy photo shape when no camera identity exists.
+
+        for field in ('camera_channel', 'camera_name', 'camera_role', 'capture_source', 'frame_id'):
+            if result.get(field) is None:
+                result.pop(field, None)
+        return result
+
+
+class OriginalPhoto(CameraPhotoIdentity):
     photo_id: str
     original_url: str
     preview_url: str
@@ -143,7 +161,7 @@ class VerificationComparison(BaseModel):
     finalized: bool = False
 
 
-class PhotoUrls(BaseModel):
+class PhotoUrls(CameraPhotoIdentity):
     photo_id: str
     original_url: str
     parts_url: str

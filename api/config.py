@@ -1,4 +1,4 @@
-"""Load local API, worker, and mock tunnel settings from the environment.
+"""Load local API, worker, Tiandy and demo settings from the environment.
 
 Depends on dotenv and pathlib; camera delivery delay never controls AI execution.
 """
@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from api.lighting_client import LightingSettings
 from api.internal_lighting import InternalLightingSettings
+from api.tiandy_client import TiandySettings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +34,12 @@ class ApiSettings:
 
     internal_lighting: InternalLightingSettings = field(default_factory=InternalLightingSettings)
     lighting: LightingSettings = field(default_factory=LightingSettings)
+    runtime_dir: Path | None = None
+    tiandy: TiandySettings = field(default_factory=TiandySettings)
+
+    @property
+    def runtime_root(self):
+        return self.runtime_dir or self.dossiers_dir.parent / ".local"
 
     @classmethod
     def from_environment(cls) -> "ApiSettings":
@@ -45,6 +52,8 @@ class ApiSettings:
 
         default_root = Path(__file__).resolve().parents[1] / "data" / "dossiers"
         return cls(
+            runtime_dir=Path(os.environ.get("CABEK_RUNTIME_DIR", PROJECT_ROOT / ".local")),
+            tiandy=TiandySettings.from_environment(),
             lighting=LightingSettings.from_environment(),
             internal_lighting=InternalLightingSettings.from_environment(),
             dossiers_dir=Path(os.environ.get("CABEK_DOSSIERS_DIR", default_root)),

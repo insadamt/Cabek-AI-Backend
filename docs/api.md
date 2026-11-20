@@ -479,3 +479,41 @@ then back to white. Capture or AI failure fades to amber. Verification has no AI
 stage and signals success after valid capture. Color changes use the lighting
 API's `transition` effect with `duration_ms: 900` and `easing: ease_in_out`, starting
 from its current output. Manual tests also cancel a pending startup-ready timer.
+
+## Local operation settings and diagnostics
+
+These routes require a loopback client and a local browser Origin, like existing
+lighting maintenance routes. The frontend always calls CABEK AI, never device URLs.
+
+- `GET /api/settings/operation` reads `{ "slow_mode": false }` by default.
+- `PATCH /api/settings/operation` accepts a strict boolean `slow_mode` and saves it
+  atomically. Changes apply to subsequent captures; capture responses include the
+  mode snapshot as `slow_mode`.
+- Normal captures turn exterior lights green and interior lights off when photos
+  finish; AI completion does not change them. Slow captures retain red, interior
+  ON and the tunnel lock until validated AI completion. Verification never waits
+  for AI. Success retains green for ten seconds; failures release ownership and
+  attempt interior OFF with exterior warning. Manual light commands return
+  `409 tunnel_busy` during either capture or a slow analysis reservation.
+- `GET /api/settings/diagnostics` returns checks and the active reservation.
+- `POST /api/settings/diagnostics/run` accepts `{}` for all safe checks, or
+  `{ "checks": ["backend", "storage"] }`. Supported IDs are `backend`, `storage`,
+  `capture`, `ai`, `catalogue`, `pricing`, `interior`, and `exterior`. Results expose
+  status, message, action, code, checked_at and duration_ms. Checks never switch
+  hardware or launch inference. Capture checks explicitly identify the mock
+  provider. Exterior reachability does not prove an ESP32/LED acknowledgement.
+- `POST /api/settings/diagnostics/pricing` performs an explicit live quote with
+  positive `marque_id`, `model_id`, `part_id`, `type_piece` (original/adaptable/occasion)
+  and optional `year`. Missing quotes are warnings rather than invented prices.
+- `GET /api/settings/logs` returns entries and `next_cursor`, accepts a limit of
+  1–500, cursor, level, component, query, dossier_id, run_id, since and until.
+  `source=worker` requires dossier_id and returns at most 64 KiB / 500 lines from
+  that dossier's confined worker log. Request bodies and credentials are excluded
+  or redacted. API responses expose a generated `X-Request-ID` for correlation.
+
+Preferences, active ownership and rotated JSON logs live in the ignored `.local/`
+folder by default (`CABEK_RUNTIME_DIR` can override it). Five log files of at most
+5 MiB each are retained. Browser logs remain local to that browser and are shown
+alongside server logs. Log-storage failures fall back to bounded in-memory history.
+Restart recovery reconciles the saved reservation with durable scan states and
+surviving workers before admitting new captures. No ESP32 API changes are required.

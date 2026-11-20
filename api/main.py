@@ -34,6 +34,13 @@ from api.capture_service import CaptureService
 from api.capture_routes import router as capture_router
 from api.lighting_client import LightingClient
 from api.settings_routes import router as settings_router, internal_router
+from api.operation_settings import OperationSettingsStore
+from api.tunnel_lifecycle import TunnelLifecycle
+from api.diagnostic_logs import DiagnosticLogStore
+from api.diagnostic_middleware import DiagnosticMiddleware
+from api.diagnostics import DiagnosticsService
+from api.diagnostic_routes import router as diagnostic_router
+from api.camera_routes import router as camera_router
 
 
 # ============================================================
@@ -48,8 +55,10 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
-        lighting.start()
+        application.state.diagnostic_logs.start()
         try:
+            await asyncio.to_thread(application.state.tunnel_lifecycle.recover)
+            lighting.start()
             await asyncio.to_thread(manager.start)
             await asyncio.to_thread(application.state.capture_service.start)
             lighting.application_ready()
@@ -59,7 +68,9 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
                 await asyncio.to_thread(application.state.capture_service.close)
                 await asyncio.to_thread(manager.close)
             finally:
+                await asyncio.to_thread(application.state.tunnel_lifecycle.close)
                 await asyncio.to_thread(lighting.close)
+                application.state.diagnostic_logs.close()
 
     application = FastAPI(
         title="CABEK Dossier API",
@@ -77,7 +88,18 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.state.workflow_service = WorkflowService(manager, application.state.vehicle_catalog)
     application.state.capture_service = CaptureService(application.state.workflow_service, settings, lighting)
     application.state.internal_lighting = application.state.capture_service.internal_lighting
+    application.state.operation_settings = OperationSettingsStore(settings.runtime_root, settings.tunnel_mode == 'mock')
+    lifecycle = TunnelLifecycle(manager.repository, settings.runtime_root, lighting, application.state.internal_lighting)
+    application.state.tunnel_lifecycle = lifecycle
+    manager.tunnel_lifecycle = lifecycle
+    application.state.capture_service.lifecycle = lifecycle
+    application.state.capture_service.operation_settings = application.state.operation_settings
+    log_store = DiagnosticLogStore(settings.runtime_root, manager.repository)
+    application.state.diagnostic_logs = log_store
+    application.state.diagnostics = DiagnosticsService(settings, manager, application.state.capture_service,
+                                                      application.state.vehicle_catalog, lifecycle, log_store)
     application.add_middleware(UploadLimitMiddleware)
+    application.add_middleware(DiagnosticMiddleware)
     application.add_exception_handler(DossierError, handle_dossier_error)
     application.add_exception_handler(RequestValidationError, handle_validation_error)
     application.add_exception_handler(HTTPException, handle_http_error)
@@ -90,7 +112,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
             allow_origins=list(settings.cors_origins),
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
             allow_headers=["Accept", "Content-Type", "Idempotency-Key", "Authorization"],
-            expose_headers=["Content-Disposition"],
+            expose_headers=["Content-Disposition", "X-Request-ID"],
         )
     application.include_router(router)
     application.include_router(scan_router)
@@ -99,6 +121,8 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(capture_router)
     application.include_router(settings_router)
     application.include_router(internal_router)
+    application.include_router(diagnostic_router)
+    application.include_router(camera_router)
     return application
 
 

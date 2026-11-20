@@ -52,7 +52,16 @@ router = APIRouter(prefix='/api/settings/lights', tags=['Local settings'],
 
 def forward_test(request, path, payload=None):
     try:
-        status, result = request.app.state.lighting.send_manual_command(path, payload)
+        from filelock import FileLock, Timeout
+
+        root = request.app.state.workflow_service.repository.dossiers_dir
+        try:
+            with FileLock(str(root / '.tunnel.lock'), timeout=0):
+                status, result = request.app.state.lighting.send_manual_command(path, payload)
+        except Timeout as error:
+            raise DossierError(409, 'tunnel_busy', 'Le tunnel est réservé pour une capture ou une analyse.') from error
+        request.app.state.diagnostic_logs.record('INFO', 'lighting.exterior',
+                                                  'Commande RGB confirmée : ' + path)
         return JSONResponse(status_code=status, content=result)
     except HTTPError as error:
         if error.code in (409, 422, 501, 503):
@@ -116,6 +125,9 @@ def internal_command(command: str, request: Request):
         with FileLock(str(root / '.tunnel.lock'), timeout=0):
             lights = request.app.state.internal_lighting
             lights.set_output(command == 'on')
+            request.app.state.internal_lights_manual_override = True
+            request.app.state.diagnostic_logs.record('INFO', 'lighting.interior',
+                                                      'Commande intérieure : ' + command)
             return lights.status()
     except Timeout as error:
         raise DossierError(409, 'tunnel_busy', 'Une capture est en cours.') from error

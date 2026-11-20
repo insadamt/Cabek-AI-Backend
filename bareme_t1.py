@@ -1,3 +1,9 @@
+"""T1 replacement labor rates and cost calculation for the expertise engine.
+
+Restores the required pricing module; depends on standard-library text
+normalization and caller-supplied replacement part prices.
+"""
+
 from __future__ import annotations
 
 import re

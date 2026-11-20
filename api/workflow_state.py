@@ -79,7 +79,10 @@ def workflow_status(dossier: "DossierRecord", scan_state: str) -> str:
 
 
 def verification_comparison(photos: list) -> VerificationComparison:
-    indexed = {(photo.phase, photo.side): photo.model_dump() for photo in photos}
+    # Essentials replace zooms in representative slots while all originals remain available.
+
+    ordered = sorted(photos, key=lambda photo: photo.camera_role == 'essential')
+    indexed = {(photo.phase, photo.side): photo.model_dump() for photo in ordered}
     return VerificationComparison(
         slots=[ComparisonSlot(side=side, before=indexed.get(("before", side)),
                               after=indexed.get(("after", side))) for side in SIDES],

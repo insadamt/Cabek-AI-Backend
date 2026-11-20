@@ -10,6 +10,23 @@ from threading import Event
 from api.lighting_client import LightingClient, LightingSettings
 
 
+def test_late_browser_events_preserve_completion_and_warning():
+    now = [0.0]
+    client = LightingClient(LightingSettings(), clock=lambda: now[0])
+    client.begin_capture('capture')
+    client.finish_capture('capture', True)
+    client.begin_startup()
+    client.application_ready()
+    assert client.prepare_command()[2]['color'] == '#00FF49'
+    now[0] = 10
+    assert client.prepare_command()[2]['color'] == '#FFFFFF'
+    client.begin_capture('failed')
+    client.finish_capture('failed', False)
+    client.application_ready()
+    client.begin_startup()
+    assert client.prepare_command()[2]['color'] == '#FF9800'
+
+
 def test_application_events_map_to_new_contract_and_completion_is_owned_here():
     now = [0.0]
     client = LightingClient(LightingSettings(), clock=lambda: now[0])

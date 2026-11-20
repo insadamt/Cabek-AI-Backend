@@ -195,7 +195,7 @@ def test_restart_recovers_only_unlocked_managed_jobs(storage, create_dossier):
 
 
 @pytest.mark.parametrize('mode, successful', [('success', True), ('late_failure', False)])
-def test_lighting_finishes_only_after_validated_worker(storage, create_dossier, mode, successful):
+def test_default_analysis_preserves_tunnel_lighting(storage, create_dossier, mode, successful):
     from threading import Event
     from unittest.mock import Mock
     from api.lighting_client import LightingClient, LightingSettings
@@ -206,11 +206,17 @@ def test_lighting_finishes_only_after_validated_worker(storage, create_dossier, 
     lighting.begin_analysis = Mock(wraps=lighting.begin_analysis)
     lighting.finish_analysis = Mock(side_effect=lambda *args: finished.set())
     app = create_app(ApiSettings(storage), FixtureBackend(mode), lighting=lighting)
+    notify_finished = app.state.tunnel_lifecycle.finish_analysis
+    def finish(run_id, outcome):
+        notify_finished(run_id, outcome)
+        finished.set()
+    app.state.tunnel_lifecycle.finish_analysis = Mock(side_effect=finish)
     with TestClient(app) as client:
         assert client.post('/api/dossiers/DOS-001/scan').status_code == 202
-        assert lighting.prepare_command()[2]['color'] == '#FF0000'
+        assert lighting.prepare_command()[2]['color'] == '#FFFFFF'
         data, _ = wait_for_terminal(client)
         assert finished.wait(1)
-        run_id = lighting.begin_analysis.call_args.args[0]
-        lighting.finish_analysis.assert_called_once_with(run_id, successful)
+        lighting.begin_analysis.assert_not_called()
+        lighting.finish_analysis.assert_not_called()
+        assert app.state.tunnel_lifecycle.finish_analysis.call_args.args[1] == successful
         assert (data['status'] == 'completed') == successful

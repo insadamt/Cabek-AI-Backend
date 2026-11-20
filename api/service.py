@@ -141,6 +141,8 @@ class DossierService:
         return [
             (WorkflowPhoto if records[photo.photo_id].side else OriginalPhoto)(
                 photo_id=photo.photo_id,
+                **{field: getattr(records[photo.photo_id], field) for field in
+                   ('camera_channel', 'camera_name', 'camera_role', 'capture_source', 'frame_id')},
                 original_url=f"{base_url}/media/{quote(photo.original_path, safe='/')}",
                 preview_url=f"{base_url}/preview/{quote(photo.original_path, safe='/')}.webp",
                 **({"side": records[photo.photo_id].side, "phase": records[photo.photo_id].phase,
@@ -184,9 +186,12 @@ class DossierService:
             response.progress.photos_completed = response.progress.photos_total
             response.progress.result_ready = response.progress.report_ready = True
 
+        originals_by_id = {photo.photo_id: photo for photo in response.photos}
         photos = [
             PhotoUrls(
                 photo_id=photo.photo_id,
+                **{field: getattr(originals_by_id.get(photo.photo_id), field, None) for field in
+                   ('camera_channel', 'camera_name', 'camera_role', 'capture_source', 'frame_id')},
                 **{
                     field.replace("_path", "_url"): f"{base_url}/media/{quote(path, safe='/')}"
                     for field, path in photo.model_dump().items()

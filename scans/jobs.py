@@ -41,6 +41,7 @@ class ScanManager:
         if not isfinite(settings.scan_timeout_seconds) or settings.scan_timeout_seconds <= 0 or settings.scan_max_pending < 1:
             raise ValueError("Scan timeout and queue capacity must be positive.")
         self.lighting = lighting
+        self.tunnel_lifecycle = None
         self.settings = settings
         self.repository = DossierRepository(settings.dossiers_dir)
         self.backend = backend or ModelProcessBackend()
@@ -118,11 +119,15 @@ class ScanManager:
                 # Release the child lock before launching; retain the admission lock for supervision.
 
                 try:
-                    if self.lighting is not None:
+                    if self.tunnel_lifecycle is not None:
+                        self.tunnel_lifecycle.begin_analysis(job.request.run_id, dossier_id)
+                    elif self.lighting is not None:
                         self.lighting.begin_analysis(job.request.run_id)
                     self.executor.submit(self.run_job, job)
                 except RuntimeError as error:
-                    if self.lighting is not None:
+                    if self.tunnel_lifecycle is not None:
+                        self.tunnel_lifecycle.finish_analysis(job.request.run_id, False)
+                    elif self.lighting is not None:
                         self.lighting.finish_analysis(job.request.run_id, False)
                     save_job_status(job, "failed", "scan_interrupted")
                     raise DossierError(503, "worker_unavailable", "The scan worker is unavailable.") from error
@@ -154,7 +159,9 @@ class ScanManager:
             successful = execute_job(job, self.backend, self.repository, self.stopping, self.settings.scan_timeout_seconds)
         finally:
             self.capacity.release()
-            if self.lighting is not None:
+            if self.tunnel_lifecycle is not None:
+                self.tunnel_lifecycle.finish_analysis(job.request.run_id, successful)
+            elif self.lighting is not None:
                 self.lighting.finish_analysis(job.request.run_id, successful)
 
     def prepare_analysis_directory(self, dossier_dir: Path) -> Path:
@@ -237,6 +244,8 @@ class ScanManager:
         record.update(status=state, error_code=None if state == "completed" else "scan_interrupted",
                       progress=progress.model_dump())
         publish_json(dossier.directory / "analysis/status.json", record)
+        if self.tunnel_lifecycle is not None and record.get("run_id"):
+            self.tunnel_lifecycle.finish_analysis(record["run_id"], state == "completed")
 
     def recover_interrupted_jobs(self) -> None:
         if not self.repository.dossiers_dir.is_dir():

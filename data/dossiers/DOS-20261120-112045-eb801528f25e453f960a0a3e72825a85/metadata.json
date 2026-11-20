@@ -1,0 +1,166 @@
+{
+  "type": "verification",
+  "marque_id": 1,
+  "model_id": 3,
+  "matricule": "4545-B-45",
+  "date_mise_en_circulation": "2000-12-12",
+  "marque": "Alfa Romeo",
+  "modele": "Giulietta",
+  "dossier_id": "DOS-20261120-112045-eb801528f25e453f960a0a3e72825a85",
+  "source": "cabek_ai",
+  "created_at": "2026-11-20T11:20:45.364011+00:00",
+  "updated_at": "2026-11-20T11:21:26.486504+00:00",
+  "annee": "2000",
+  "photos": [
+    {
+      "path": "photos/before/a9aa8b424fe8ee0a5ad75ac110184302.jpg",
+      "photo_id": "a9aa8b424fe8ee0a5ad75ac110184302",
+      "phase": "before",
+      "side": "front",
+      "capture_id": "47dbe2b35e21464ab796e3af07abfa46",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-20T11:20:50.328854+00:00"
+    },
+    {
+      "path": "photos/before/020feca07c3137d9212cf1f07ee28568.jpg",
+      "photo_id": "020feca07c3137d9212cf1f07ee28568",
+      "phase": "before",
+      "side": "left",
+      "capture_id": "47dbe2b35e21464ab796e3af07abfa46",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-20T11:20:51.113405+00:00"
+    },
+    {
+      "path": "photos/before/aa7e3aaa878275156408b151e58dba83.jpg",
+      "photo_id": "aa7e3aaa878275156408b151e58dba83",
+      "phase": "before",
+      "side": "rear",
+      "capture_id": "47dbe2b35e21464ab796e3af07abfa46",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-20T11:20:51.887286+00:00"
+    },
+    {
+      "path": "photos/before/a7515edddc762e9930f05c3002866981.jpg",
+      "photo_id": "a7515edddc762e9930f05c3002866981",
+      "phase": "before",
+      "side": "right",
+      "capture_id": "47dbe2b35e21464ab796e3af07abfa46",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-20T11:20:52.662069+00:00"
+    },
+    {
+      "path": "photos/after/2fe8672243d54df954a5078a85e5af28.jpg",
+      "photo_id": "2fe8672243d54df954a5078a85e5af28",
+      "phase": "after",
+      "side": "front",
+      "capture_id": "6f220b40867045dfb62e578b580dad7c",
+      "original_filename": "front_01.jpg",
+      "source": "front_01.jpg",
+      "uploaded_at": "2026-11-20T11:21:23.326304+00:00"
+    },
+    {
+      "path": "photos/after/81085213a1afa9a7d466b116028b9325.jpg",
+      "photo_id": "81085213a1afa9a7d466b116028b9325",
+      "phase": "after",
+      "side": "left",
+      "capture_id": "6f220b40867045dfb62e578b580dad7c",
+      "original_filename": "left_01.jpg",
+      "source": "left_01.jpg",
+      "uploaded_at": "2026-11-20T11:21:24.101144+00:00"
+    },
+    {
+      "path": "photos/after/23b3c632d671209dcb29c8fda7d6e522.jpg",
+      "photo_id": "23b3c632d671209dcb29c8fda7d6e522",
+      "phase": "after",
+      "side": "rear",
+      "capture_id": "6f220b40867045dfb62e578b580dad7c",
+      "original_filename": "rear_01.jpg",
+      "source": "rear_01.jpg",
+      "uploaded_at": "2026-11-20T11:21:24.885522+00:00"
+    },
+    {
+      "path": "photos/after/a71d90ed2ec2bae57b32045f02c85635.jpg",
+      "photo_id": "a71d90ed2ec2bae57b32045f02c85635",
+      "phase": "after",
+      "side": "right",
+      "capture_id": "6f220b40867045dfb62e578b580dad7c",
+      "original_filename": "right_01.jpg",
+      "source": "right_01.jpg",
+      "uploaded_at": "2026-11-20T11:21:25.694908+00:00"
+    }
+  ],
+  "photo_history": [],
+  "workflow_status": "comparison_ready",
+  "creation_key": "91cf2ddd8e174b16dbf00a8955dc53279e588c46ed74bda295c363f2281aada3",
+  "creation_request": {
+    "type": "verification",
+    "marque_id": null,
+    "model_id": null,
+    "matricule": "",
+    "date_mise_en_circulation": null
+  },
+  "captures": {
+    "before": {
+      "capture_id": "47dbe2b35e21464ab796e3af07abfa46",
+      "phase": "before",
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-20T11:20:49.707556+00:00",
+      "status": "completed",
+      "error_code": null,
+      "stage": "completed",
+      "slow_mode": true,
+      "updated_at": "2026-11-20T11:20:53.444473+00:00"
+    },
+    "after": {
+      "capture_id": "6f220b40867045dfb62e578b580dad7c",
+      "phase": "after",
+      "samples": [
+        {
+          "source": "front_01.jpg",
+          "side": "front"
+        },
+        {
+          "source": "left_01.jpg",
+          "side": "left"
+        },
+        {
+          "source": "rear_01.jpg",
+          "side": "rear"
+        },
+        {
+          "source": "right_01.jpg",
+          "side": "right"
+        }
+      ],
+      "created_at": "2026-11-20T11:21:22.697142+00:00",
+      "status": "completed",
+      "error_code": null,
+      "stage": "completed",
+      "slow_mode": true,
+      "updated_at": "2026-11-20T11:21:26.486463+00:00"
+    }
+  },
+  "before_finalized_at": "2026-11-20T11:21:23.329251+00:00",
+  "evidence_finalized_at": "2026-11-20T11:21:26.491942+00:00"
+}

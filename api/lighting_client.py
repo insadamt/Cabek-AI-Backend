@@ -10,6 +10,7 @@ import math
 import os
 from threading import Event, Lock, RLock, Thread
 import time
+from datetime import datetime, timezone
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
@@ -49,6 +50,9 @@ class LightingClient:
         self.clock = clock
         self.lock = RLock()
         self.command_lock = Lock()
+        self.last_acknowledged_at = None
+        self.last_command_error = None
+        self.manual_override = False
         self.sent_revision = -1
         self.capture_id = None
         self.analysis_ids = set()
@@ -66,6 +70,7 @@ class LightingClient:
 
     def set_effect(self, effect='solid', **parameters):
         with self.lock:
+            self.manual_override = False
             self.path = '/set'
             self.payload = {'effect': effect, **parameters}
             self.revision += 1
@@ -84,7 +89,7 @@ class LightingClient:
 
     def begin_startup(self):
         with self.lock:
-            if self.capture_id is not None or self.analysis_ids or self.awaiting_analysis:
+            if self.capture_id is not None or self.analysis_ids or self.awaiting_analysis or self.has_completion_signal():
                 return
             self.completion_deadline = None
             self.startup_minimum_deadline = self.clock() + 4
@@ -93,6 +98,8 @@ class LightingClient:
 
     def application_ready(self):
         with self.lock:
+            if self.has_completion_signal():
+                return
             if self.capture_id is None and not self.analysis_ids and not self.awaiting_analysis:
                 if self.startup_minimum_deadline is not None and self.clock() < self.startup_minimum_deadline:
                     self.ready_deadline = self.startup_minimum_deadline
@@ -100,6 +107,12 @@ class LightingClient:
                 self.ready_deadline = None
                 self.startup_minimum_deadline = None
                 self.transition_to('#FFFFFF')
+
+    def has_completion_signal(self):
+        # A late browser startup/ready message cannot erase a success hold or failure warning.
+
+        return self.completion_deadline is not None or bool(self.payload and (
+            self.payload.get('color') == '#FF9800' or self.payload.get('effect') == 'warning'))
 
     def begin_capture(self, capture_id):
         with self.lock:
@@ -165,6 +178,8 @@ class LightingClient:
                 raise ValueError('Invalid lighting response')
             if response.status not in (200, 202) or result.get('success') is not True:
                 raise OSError('Lighting command was not accepted')
+            self.last_acknowledged_at = datetime.now(timezone.utc).isoformat()
+            self.last_command_error = None
             return response.status, result
 
     def send_manual_command(self, path, payload):
@@ -178,6 +193,7 @@ class LightingClient:
                 # Preserve a newer capture event that arrived during the manual HTTP request.
 
                 if self.revision == previous_revision:
+                    self.manual_override = True
                     self.ready_deadline = None
                     self.completion_deadline = None
                     self.path, self.payload = path, payload
@@ -195,6 +211,7 @@ class LightingClient:
                         self.send(path, payload)
                         self.sent_revision = revision
                     except Exception as error:
+                        self.last_command_error = type(error).__name__
                         logger.warning('Lighting API unavailable: %s', type(error).__name__)
             with self.lock:
                 # Recheck after slow HTTP so shutdown arriving during a request still sends OFF.

@@ -34,6 +34,11 @@ class PhotoMetadata(BaseModel):
     capture_id: str | None = None
     original_filename: str | None = None
     source: str | None = None
+    camera_channel: int | None = None
+    camera_name: str | None = None
+    camera_role: str | None = None
+    capture_source: str | None = None
+    frame_id: str | None = None
 
 
 class DossierMetadata(Vehicle):

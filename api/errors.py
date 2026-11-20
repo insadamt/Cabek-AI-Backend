@@ -28,6 +28,10 @@ def error_response(status_code: int, code: str, message: str) -> JSONResponse:
 
 
 def handle_dossier_error(request: Request, error: DossierError) -> JSONResponse:
+    store = getattr(request.app.state, 'diagnostic_logs', None)
+    if store is not None:
+        store.record('ERROR' if error.status_code >= 500 else 'WARNING', 'api.errors', error.message,
+                     code=error.code, request_id=getattr(request.state, 'request_id', ''))
     return error_response(error.status_code, error.code, error.message)
 
 
