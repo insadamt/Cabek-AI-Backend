@@ -1,0 +1,2 @@
+# E-Constat first-page rendering; uses the existing API requests/Pillow dependencies.
+pymupdf>=1.24

@@ -1,3 +1,5 @@
+# Exclude private configuration, generated data, and local tooling.
+# Depends on this repository's runtime and development directory layout.
 __pycache__/
 *.pyc
 .venv/
@@ -29,3 +31,9 @@ data/dossiers/.delete-*/
 # Runtime dossier locks belong to local processes, not saved application data.
 data/dossiers/**/.capture.lock
 data/dossiers/**/.metadata.lock
+
+# Versioned E-Constat preparation and first-page previews are derived artifacts.
+data/dossiers/**/.econstat/
+
+# Dossiers contain installation data and generated inspection documents.
+/data/dossiers/

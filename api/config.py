@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from api.lighting_client import LightingSettings
 from api.internal_lighting import InternalLightingSettings
 from api.tiandy_client import TiandySettings
+from api.econstat_client import EconstatSettings
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,7 @@ class ApiSettings:
     internal_lighting: InternalLightingSettings = field(default_factory=InternalLightingSettings)
     lighting: LightingSettings = field(default_factory=LightingSettings)
     runtime_dir: Path | None = None
+    econstat: EconstatSettings = field(default_factory=EconstatSettings)
     tiandy: TiandySettings = field(default_factory=TiandySettings)
 
     @property
@@ -54,6 +56,7 @@ class ApiSettings:
         return cls(
             runtime_dir=Path(os.environ.get("CABEK_RUNTIME_DIR", PROJECT_ROOT / ".local")),
             tiandy=TiandySettings.from_environment(),
+            econstat=EconstatSettings.from_environment(),
             lighting=LightingSettings.from_environment(),
             internal_lighting=InternalLightingSettings.from_environment(),
             dossiers_dir=Path(os.environ.get("CABEK_DOSSIERS_DIR", default_root)),

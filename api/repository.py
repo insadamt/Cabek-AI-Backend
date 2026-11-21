@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from api.errors import DossierError
+from api.econstat_contracts import EconstatAttachment
 from api.files import (
     DOSSIER_ID_PATTERN,
     IMAGE_TYPES,
@@ -51,6 +52,7 @@ class DossierMetadata(Vehicle):
     evidence_finalized_at: str | None = None
     photos: list[PhotoMetadata] = Field(default_factory=list)
     captures: dict[str, dict] = Field(default_factory=dict)
+    econstat: EconstatAttachment | None = None
 
     @field_validator("marque", "modele", mode="before")
     @classmethod

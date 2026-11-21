@@ -41,6 +41,8 @@ from api.diagnostic_middleware import DiagnosticMiddleware
 from api.diagnostics import DiagnosticsService
 from api.diagnostic_routes import router as diagnostic_router
 from api.camera_routes import router as camera_router
+from api.econstat_service import EconstatService
+from api.econstat_routes import router as econstat_router
 
 
 # ============================================================
@@ -65,6 +67,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
             yield
         finally:
             try:
+                await asyncio.to_thread(application.state.econstat_service.close)
                 await asyncio.to_thread(application.state.capture_service.close)
                 await asyncio.to_thread(manager.close)
             finally:
@@ -82,6 +85,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     # Keep storage configuration on this app instance so tests can use isolated folders.
 
     application.state.dossier_service = DossierService(DossierRepository(settings.dossiers_dir))
+    application.state.econstat_service = EconstatService(application.state.dossier_service.repository, settings.econstat)
     application.state.scan_manager = manager
     application.state.lighting = lighting
     application.state.vehicle_catalog = VehicleCatalog()
@@ -123,6 +127,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(internal_router)
     application.include_router(diagnostic_router)
     application.include_router(camera_router)
+    application.include_router(econstat_router)
     return application
 
 
