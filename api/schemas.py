@@ -212,7 +212,18 @@ class ScanProgress(BaseModel):
     result_ready: bool
 
 
-class DossierResult(BaseModel):
+class DemoAuditedResponse(BaseModel):
+    demo: bool = False
+
+    @model_serializer(mode='wrap')
+    def omit_production_default(self, handler):
+        result = handler(self)
+        if not self.demo:
+            result.pop('demo', None)
+        return result
+
+
+class DossierResult(DemoAuditedResponse):
     dossier_id: str
     type: DossierType = "forfait_expertise"
     source: str = "external"
@@ -237,7 +248,7 @@ class DossierResult(BaseModel):
 # DASHBOARD SUMMARIES AND COUNTS
 # ============================================================
 
-class DossierSummary(BaseModel):
+class DossierSummary(DemoAuditedResponse):
     dossier_id: str
     type: DossierType = "forfait_expertise"
     source: str = "external"

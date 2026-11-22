@@ -47,6 +47,8 @@ def update_operation(payload: OperationUpdate, request: Request):
     changes = payload.model_dump(exclude_unset=True)
     if not changes or any(value is None for value in changes.values()):
         raise DossierError(422, 'invalid_request', 'Indiquez au moins un paramètre booléen.')
+    if 'demo_mode' in changes:
+        raise DossierError(403, 'demo_admin_required', 'Utilisez l’administration privée pour modifier le mode démonstration.')
     result = request.app.state.operation_settings.update(**changes)
     request.app.state.diagnostic_logs.record('INFO', 'settings.operation',
                                            'Préférences de fonctionnement sauvegardées')

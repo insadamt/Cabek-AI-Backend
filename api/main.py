@@ -77,7 +77,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
 
     application = FastAPI(
         title="CABEK Dossier API",
-        version="0.1.0",
+        version="0.2.0",
         description="Read dossiers, queue real scans, and retrieve saved expertise with file-based progress.",
         lifespan=lifespan,
     )
@@ -128,6 +128,11 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(diagnostic_router)
     application.include_router(camera_router)
     application.include_router(econstat_router)
+    from api.private_demo.service import PrivateDemoService
+    from api.private_demo.routes import router as private_demo_router
+    application.state.private_demo = PrivateDemoService(application, settings)
+    manager.private_demo = application.state.private_demo
+    application.include_router(private_demo_router)
     return application
 
 

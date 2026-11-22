@@ -27,8 +27,10 @@ class DiagnosticMiddleware(BaseHTTPMiddleware):
             store.record('ERROR', 'api.http', type(error).__name__, code='unhandled_exception', **context)
             raise
         response.headers['X-Request-ID'] = request_id
+        if path.startswith('/api/private-demo'):
+            response.headers['Cache-Control'] = 'no-store'
         if response.status_code >= 400 or not path.startswith('/api/settings'):
             level = 'ERROR' if response.status_code >= 500 else 'WARNING' if response.status_code >= 400 else 'INFO'
             store.record(level, 'api.http', '%s %s · HTTP %s · %s ms' % (
-                request.method, path, response.status_code, round((time.monotonic() - started) * 1000)), **context)
+                request.method, '/api/private-demo' if path.startswith('/api/private-demo') else path, response.status_code, round((time.monotonic() - started) * 1000)), **context)
         return response

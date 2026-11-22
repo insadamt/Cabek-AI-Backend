@@ -61,6 +61,8 @@ class EconstatService:
         key = (dossier_id, document.version)
         with self.lock:
             cached = self.cached_result(document)
+            if self.repository.read_dossier(dossier_id).metadata.demo and not cached:
+                raise DossierError(409, 'demo_ocr_missing', 'Résultat OCR préparé requis ; aucun OCR réel ne sera lancé.')
             active = self.jobs.get(key)
             if (cached and cached['status'] in ('ready', 'manual_required')) or (active and not active.done()):
                 return self.describe(dossier_id, root_path)

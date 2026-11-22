@@ -19,15 +19,16 @@ class UploadLimitMiddleware:
         if scope["type"] != "http" or not headers.get(b"content-type", b"").lower().startswith(b"multipart/form-data"):
             await self.app(scope, receive, send)
             return
+        limit = 129 * 1024 * 1024 if scope.get('path') == '/api/private-demo/import' else MAX_MULTIPART_BYTES
         content = bytearray()
         while True:
             message = await receive()
             if message["type"] == "http.disconnect":
                 return
             body = message.get("body", b"")
-            if len(content) + len(body) > MAX_MULTIPART_BYTES:
+            if len(content) + len(body) > limit:
                 await JSONResponse(status_code=413, content={"error": {
-                    "code": "upload_too_large", "message": "Multipart requests must not exceed 11 MiB.",
+                    "code": "upload_too_large", "message": "Multipart request exceeds the allowed size.",
                 }})(scope, receive, send)
                 return
             content.extend(body)

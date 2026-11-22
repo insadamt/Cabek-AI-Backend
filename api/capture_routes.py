@@ -20,6 +20,9 @@ router = APIRouter(prefix="/api/dossiers", tags=["Tunnel capture"], responses={
 def start_capture(dossier_id: DossierId, request: Request, payload: CaptureRequest = CaptureRequest()):
     captures = request.app.state.capture_service
     zooms = payload.zoom_channels if 'zoom_channels' in payload.model_fields_set else None
+    matched = request.app.state.private_demo.capture(dossier_id, payload.phase)
+    if matched:
+        return captures.read_status(matched, payload.phase, request.scope.get("root_path", ""))
     captures.start_capture(dossier_id, payload.phase, zooms)
     return captures.read_status(dossier_id, payload.phase, request.scope.get("root_path", ""))
 

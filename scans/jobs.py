@@ -71,6 +71,10 @@ class ScanManager:
 
     @serialize_dossier(timeout=0)
     def start_scan(self, dossier_id: str) -> DossierResult:
+        if getattr(self, 'private_demo', None):
+            prepared = self.private_demo.guard_scan(dossier_id)
+            if prepared is not None:
+                return prepared
         dossier = self.repository.read_dossier(dossier_id)
         self.reject_disabled_scan(dossier)
         analysis_dir = self.prepare_analysis_directory(dossier.directory)

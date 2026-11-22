@@ -43,7 +43,8 @@ def test_settings_partial_updates_and_legacy_file(camera_app):
     store.path.write_text(json.dumps({'slow_mode': True}))
     with TestClient(camera_app, client=('127.0.0.1', 1234)) as client:
         assert client.get('/api/settings/operation').json() == {'slow_mode': True, 'demo_mode': False}
-        assert client.patch('/api/settings/operation', json={'demo_mode': True}).json() == {'slow_mode': True, 'demo_mode': True}
+        assert client.patch('/api/settings/operation', json={'demo_mode': True}).status_code == 403
+        store.update(demo_mode=True)
         for invalid in ({}, {'demo_mode': None}, {'demo_mode': 1}, {'demo_mode': 'true'}):
             assert client.patch('/api/settings/operation', json=invalid).status_code == 422
         assert client.patch('/api/settings/operation', json={'slow_mode': False}).json()['demo_mode']
@@ -145,7 +146,7 @@ def test_source_snapshot_survives_setting_change(camera_app, monkeypatch):
         try:
             assert client.post(f'/api/dossiers/{dossier}/capture', json={'phase': 'before', 'zoom_channels': [1]}).status_code == 202
             assert entered.wait(2)
-            client.patch('/api/settings/operation', json={'demo_mode': False})
+            camera_app.state.operation_settings.update(demo_mode=False)
         finally:
             release.set()
         result = wait_capture(client, dossier, 'before')

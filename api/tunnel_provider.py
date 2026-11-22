@@ -25,8 +25,12 @@ class MockTunnelProvider:
 
     def plan_capture(self, phase: str | None) -> list[dict]:
         if self.root is None or not self.root.is_dir():
-            raise DossierError(503, "mock_photos_unavailable", "Configure a sample photograph directory.")
+            raise DossierError(503, "mock_photos_unavailable", "Configure CABEK_MOCK_PHOTOS_DIR et son volume persistant avec des photos front, rear, left et right.")
         source = self.root / phase if phase and (self.root / phase).is_dir() else self.root
+        if phase is None and (self.root / 'before').is_dir():
+            source = self.root / 'before'
+        if phase and not (self.root / phase).is_dir() and any((self.root / name).is_dir() for name in ('before', 'after')):
+            raise DossierError(422, 'mock_phase_missing', 'Photographies manquantes pour la phase ' + phase + '.')
         samples = []
         for path in sorted(source.rglob("*")):
             relative = path.relative_to(source)
@@ -52,7 +56,7 @@ class MockTunnelProvider:
     def read_photo(self, source: str) -> tuple[bytes, str]:
         self.validate_source_path(source)
         if self.root is None:
-            raise DossierError(503, "mock_photos_unavailable", "Configure a sample photograph directory.")
+            raise DossierError(503, "mock_photos_unavailable", "Configure CABEK_MOCK_PHOTOS_DIR et son volume persistant avec des photos front, rear, left et right.")
         path = self.root / source
         if not path.resolve().is_relative_to(self.root) or any(parent.is_symlink() for parent in (path, *path.parents) if parent != self.root.parent):
             raise DossierError(422, "unsafe_sample_path", "Sample paths must remain inside their configured directory.")

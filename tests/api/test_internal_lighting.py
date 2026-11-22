@@ -80,7 +80,8 @@ def test_failure_blocks_photos_and_retry_succeeds(storage, tmp_path, monkeypatch
         assert failed['saved_count'] == 0
         assert failed['error_code'] == 'internal_lighting_unavailable'
         assert failed['error_message']
-        warning.assert_called_with('warning', repeat=True, brightness=100)
+        # Cleanup may issue a fallback transition after a warning acknowledgement fails.
+        warning.assert_any_call('warning', repeat=True, brightness=100)
         events = []
         monkeypatch.setattr(lights, 'rpc', lambda method, payload=None: events.append((method, payload)) or {'output': True})
         read = app.state.capture_service.provider.read_photo

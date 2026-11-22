@@ -77,7 +77,7 @@ class DossierService:
                     continue
                 analysis, state = self.repository.read_analysis_state(dossier)
                 summaries.append(DossierSummary(
-                    dossier_id=dossier_id,
+                    dossier_id=dossier_id, demo=dossier.metadata.demo,
                     type=dossier.metadata.type, source=dossier.metadata.source,
                     workflow_status=workflow_status(dossier, state),
                     updated_at=dossier.metadata.updated_at,
@@ -157,7 +157,7 @@ class DossierService:
         base_url = f"{root_path.rstrip('/')}/api/dossiers/{quote(dossier_id, safe='')}"
         analysis, state = self.repository.read_analysis_state(dossier)
         response = DossierResult(
-            dossier_id=dossier_id, status=state, progress=self.repository.read_progress(dossier),
+            dossier_id=dossier_id, demo=dossier.metadata.demo, status=state, progress=self.repository.read_progress(dossier),
             type=dossier.metadata.type, source=dossier.metadata.source,
             created_at=dossier.metadata.created_at, updated_at=dossier.metadata.updated_at,
             workflow_status=workflow_status(dossier, state),

@@ -58,7 +58,7 @@ class CaptureService:
                     if capture.get("status") == "capturing":
                         with FileLock(str(dossier.directory / ".capture.lock"), timeout=0):
                             self.update_capture(dossier_id, key, status="failed", error_code="capture_interrupted")
-                    elif capture.get("status") == "completed" and dossier.metadata.type != "verification":
+                    elif capture.get("status") == "completed" and dossier.metadata.type != "verification" and dossier.metadata.imported_capture_resume:
                         self.start_analysis(dossier_id, key)
             except (DossierError, OSError, Timeout):
                 continue
@@ -304,7 +304,7 @@ class CaptureService:
     @serialize_dossier
     def start_analysis(self, dossier_id, key, *, retry_failed=False):
         dossier = self.workflows.repository.read_dossier(dossier_id)
-        if dossier.metadata.type == "verification":
+        if dossier.metadata.type == "verification" or dossier.metadata.demo:
             return
         _, state = self.workflows.repository.read_analysis_state(dossier)
         if state != "not_analyzed" and not (

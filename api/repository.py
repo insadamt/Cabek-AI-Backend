@@ -43,6 +43,9 @@ class PhotoMetadata(BaseModel):
 
 
 class DossierMetadata(Vehicle):
+    imported_capture_resume: bool = True
+    demo: bool = False
+    demo_provenance: dict | None = None
     dossier_id: str
     type: DossierType = "forfait_expertise"
     source: str = "external"
