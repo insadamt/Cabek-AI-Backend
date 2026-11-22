@@ -62,6 +62,7 @@ def prepare_clone(templates, item, destination, dossier_id, phase=None, existing
     metadata.update(dossier_id=dossier_id, demo=True, demo_provenance={'template_id': item['id'], 'version': item['version']},
                     created_at=timestamp(), updated_at=timestamp(), photo_history=[], captures={})
     metadata.pop('before_finalized_at', None); metadata.pop('evidence_finalized_at', None)
+    metadata.pop('creation_key', None); metadata.pop('creation_request', None)
     if existing:
         if existing.get('demo_provenance') != metadata['demo_provenance']:
             raise DossierError(409, 'demo_version_changed', 'Le modèle a changé. Recommencez une démonstration indépendante.')

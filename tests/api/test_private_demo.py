@@ -288,3 +288,18 @@ def test_failed_materialization_does_not_change_existing_dossier(private_client,
     assert private_client.post('/api/dossiers/'+draft['dossier_id']+'/capture',json={}).status_code==503
     assert path.read_bytes()==before
     assert not list(path.parent.parent.glob('.demo-stage-*'))
+
+
+def test_materialization_retains_draft_idempotency_instead_of_template_creation_identity(private_client,native_template,workflow_catalog):
+    metadata=json.loads((native_template/'metadata.json').read_text())
+    metadata.update(creation_key='template-only-key',creation_request={'type':'old-template'})
+    (native_template/'metadata.json').write_text(json.dumps(metadata))
+    register(private_client,native_template)
+    private_client.put('/api/private-demo/mode',json={'enabled':True},headers=HEADERS)
+    payload={'type':'chiffrage_rapide','matricule':'84547-H-06'}
+    headers={'Idempotency-Key':'operator-creation-key'}
+    draft=private_client.post('/api/dossiers',json=payload,headers=headers).json()
+    assert private_client.post('/api/dossiers/'+draft['dossier_id']+'/capture',json={}).status_code==202
+    repeated=private_client.post('/api/dossiers',json=payload,headers=headers)
+    assert repeated.status_code==201,repeated.text
+    assert repeated.json()['dossier_id']==draft['dossier_id']

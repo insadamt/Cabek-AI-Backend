@@ -77,7 +77,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
 
     application = FastAPI(
         title="CABEK Dossier API",
-        version="0.2.0",
+        version="0.2.1",
         description="Read dossiers, queue real scans, and retrieve saved expertise with file-based progress.",
         lifespan=lifespan,
     )

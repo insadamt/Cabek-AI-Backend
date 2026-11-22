@@ -79,6 +79,9 @@ class PrivateDemoService:
                                 created_files.append(destination)
                             destination.parent.mkdir(parents=True, exist_ok=True)
                             shutil.copy2(path, destination)
+                    for field in ('creation_key', 'creation_request'):
+                        if field in metadata:
+                            prepared[field] = metadata[field]
                     publish_json(target / 'metadata.json', prepared)
                     metadata_published = True
                     for name in ('analysis/result.json', 'analysis/status.json'):
