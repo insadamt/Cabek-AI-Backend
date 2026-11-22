@@ -43,6 +43,7 @@ from api.diagnostic_routes import router as diagnostic_router
 from api.camera_routes import router as camera_router
 from api.econstat_service import EconstatService
 from api.econstat_routes import router as econstat_router
+from api.manager_control import router as manager_router, MaintenanceMiddleware
 
 
 # ============================================================
@@ -102,6 +103,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.state.diagnostic_logs = log_store
     application.state.diagnostics = DiagnosticsService(settings, manager, application.state.capture_service,
                                                       application.state.vehicle_catalog, lifecycle, log_store)
+    application.add_middleware(MaintenanceMiddleware, runtime_root=settings.runtime_root)
     application.add_middleware(UploadLimitMiddleware)
     application.add_middleware(DiagnosticMiddleware)
     application.add_exception_handler(DossierError, handle_dossier_error)
@@ -128,6 +130,7 @@ def create_app(settings: ApiSettings | None = None, scan_backend: ScanBackend | 
     application.include_router(diagnostic_router)
     application.include_router(camera_router)
     application.include_router(econstat_router)
+    application.include_router(manager_router)
     return application
 
 

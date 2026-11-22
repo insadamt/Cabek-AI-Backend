@@ -1,0 +1,16 @@
+# Build release candidates without publishing them; depends on the service Dockerfile.
+name: Service release checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build -t cabek-service:test .
+      - run: docker run --rm -e CABEK_INTERNAL_LIGHTS_ENABLED=false cabek-service:test sh -c "python -m pip install pytest httpx && python -m pytest tests -q"

@@ -25,6 +25,9 @@ def is_loopback_host(host):
 
 
 def require_local_settings(request: Request):
+    from api.manager_control import manager_authenticated
+    if manager_authenticated(request):
+        return
     if not is_loopback_host(getattr(request.client, 'host', None)):
         raise DossierError(403, 'local_settings_only', 'Hardware settings are available on the tunnel PC only.')
     origin = request.headers.get('origin')

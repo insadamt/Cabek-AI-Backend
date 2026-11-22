@@ -4,7 +4,7 @@ Depends on file repositories, AutoEstimate validation, and subprocess supervisio
 verification dossiers are rejected before any scan files or jobs are created.
 """
 
-from concurrent.futures import ThreadPoolExecutor
+from api.job_tracking import TrackedExecutor
 import json
 import logging
 from math import isfinite
@@ -45,7 +45,7 @@ class ScanManager:
         self.settings = settings
         self.repository = DossierRepository(settings.dossiers_dir)
         self.backend = backend or ModelProcessBackend()
-        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cabek-scan")
+        self.executor = TrackedExecutor(max_workers=1, thread_name_prefix="cabek-scan")
         self.capacity = BoundedSemaphore(settings.scan_max_pending)
         self.stopping = Event()
         self.lifecycle_lock = Lock()
