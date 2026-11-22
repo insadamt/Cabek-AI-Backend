@@ -303,3 +303,25 @@ def test_materialization_retains_draft_idempotency_instead_of_template_creation_
     repeated=private_client.post('/api/dossiers',json=payload,headers=headers)
     assert repeated.status_code==201,repeated.text
     assert repeated.json()['dossier_id']==draft['dossier_id']
+
+
+def test_native_mpdf_attachment_preamble_is_preserved(private_client,native_template):
+    from pypdf import PdfWriter
+    output=io.BytesIO();writer=PdfWriter();writer.add_blank_page(width=100,height=100);writer.write(output)
+    content=b'q\nQ\n'+output.getvalue()
+    (native_template/'documents').mkdir();(native_template/'documents/econstat.pdf').write_bytes(content)
+    metadata=json.loads((native_template/'metadata.json').read_text());metadata['econstat']={'path':'documents/econstat.pdf'}
+    (native_template/'metadata.json').write_text(json.dumps(metadata))
+    item=register(private_client,native_template)
+    response=private_client.get('/api/private-demo/templates/'+item['id']+'/export')
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        assert archive.read('documents/econstat.pdf')==content
+
+
+def test_invalid_econstat_pdf_fails_closed(private_client,native_template):
+    (native_template/'documents').mkdir();(native_template/'documents/econstat.pdf').write_bytes(b'%PDF-broken')
+    metadata=json.loads((native_template/'metadata.json').read_text());metadata['econstat']={'path':'documents/econstat.pdf'}
+    (native_template/'metadata.json').write_text(json.dumps(metadata))
+    response=private_client.post('/api/private-demo/import',files={'file':('invalid.zip',export_zip(native_template),'application/zip')},headers=HEADERS)
+    assert response.status_code==422
