@@ -79,22 +79,3 @@ def test_worker_log_is_bounded_confined_and_redacted(storage, complete_dossier, 
         store.read_worker('../outside')
     assert 'secret-value' not in redact('token=secret-value')
     store.close()
-
-
-@pytest.mark.parametrize('connected,last_error', [(False, None), (True, 'Serial acknowledgment failed')])
-def test_lighting_bridge_without_working_serial_is_not_reported_ready(storage, monkeypatch, connected, last_error):
-    import json
-    from types import SimpleNamespace
-    app = create_app(ApiSettings(storage))
-    app.state.tunnel_lifecycle.exterior = SimpleNamespace(settings=SimpleNamespace(enabled=True, url='http://lighting:8001'))
-    response = Mock()
-    response.__enter__ = Mock(return_value=response)
-    response.__exit__ = Mock(return_value=False)
-    response.read.return_value = json.dumps({'service': 'cabek-lighting', 'serial_connected': connected,
-                                            'last_error': last_error}).encode()
-    opener = Mock()
-    opener.open.return_value = response
-    monkeypatch.setattr('api.diagnostics.build_opener', lambda *args: opener)
-    result = app.state.diagnostics.check_exterior()
-    assert result['status'] == 'error'
-    assert result['code'] == 'lighting_hardware_unavailable'

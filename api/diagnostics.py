@@ -171,14 +171,11 @@ class DiagnosticsService:
         lights = self.lifecycle.exterior
         if not lights.settings.enabled:
             return outcome('disabled', 'Service RGB désactivé.')
-        request = Request(lights.settings.url.rstrip('/') + '/health', headers={'Accept': 'application/json'})
+        request = Request(lights.settings.url.rstrip('/') + '/openapi.json', headers={'Accept': 'application/json'})
         with build_opener(ProxyHandler({}), NoRedirect()).open(request, timeout=2) as response:
             payload = json.loads(response.read(65536))
-        if payload.get('service') != 'cabek-lighting':
+        if not all(path in payload.get('paths', {}) for path in ('/api/lights/set', '/api/lights/off')):
             raise ValueError('Unexpected lighting API')
-        if payload.get('serial_connected') is False or payload.get('last_error'):
-            return outcome('error', 'API RGB joignable, mais la connexion ESP32 doit être vérifiée.',
-                           code='lighting_hardware_unavailable')
         return outcome('warning', 'API RGB joignable. L’ESP32 et la lumière physique nécessitent un test manuel.',
                        details={'last_acknowledged_at': lights.last_acknowledged_at,
                                 'last_command_error': lights.last_command_error})

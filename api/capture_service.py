@@ -4,7 +4,7 @@ Depends on workflow locks, validated sample bytes, and the existing scan manager
 Expertise retries start a fresh photo set; other workflows retain phase-based recovery.
 """
 
-from api.job_tracking import TrackedExecutor
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import logging
 from math import isfinite
@@ -44,7 +44,7 @@ class CaptureService:
         self.settings = settings
         self.provider = MockTunnelProvider(settings.mock_photos_dir)
         self.cameras = CameraService(self)
-        self.executor = TrackedExecutor(max_workers=1, thread_name_prefix="cabek-capture")
+        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="cabek-capture")
         self.stopping = Event()
 
     def start(self):
