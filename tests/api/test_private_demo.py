@@ -325,3 +325,23 @@ def test_invalid_econstat_pdf_fails_closed(private_client,native_template):
     (native_template/'metadata.json').write_text(json.dumps(metadata))
     response=private_client.post('/api/private-demo/import',files={'file':('invalid.zip',export_zip(native_template),'application/zip')},headers=HEADERS)
     assert response.status_code==422
+
+
+def test_private_verification_preview_publishes_both_prepared_phases(private_client,native_template):
+    from PIL import Image
+    shutil.rmtree(native_template/'analysis');shutil.rmtree(native_template/'photos')
+    metadata=json.loads((native_template/'metadata.json').read_text());metadata.update(type='verification',photos=[])
+    for phase in ('before','after'):
+        for side in ('front','rear','left','right'):
+            relative=f'photos/{phase}/{phase}-{side}.jpg';target=native_template/relative;target.parent.mkdir(parents=True,exist_ok=True)
+            Image.new('RGB',(12,12),'gray').save(target)
+            metadata['photos'].append({'path':relative,'side':side,'phase':phase})
+    (native_template/'metadata.json').write_text(json.dumps(metadata))
+    item=register(private_client,native_template,active=False)
+    response=private_client.post('/api/private-demo/templates/'+item['id']+'/test',headers=HEADERS)
+    assert response.status_code==201,response.text
+    result=response.json()
+    assert result['demo'] and result['workflow_status']=='comparison_ready'
+    assert len(result['photos'])==8 and result['comparison']['finalized']
+    assert result['result'] is None
+    for photo in result['photos']:assert private_client.get(photo['original_url']).status_code==200

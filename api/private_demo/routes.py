@@ -163,7 +163,20 @@ def test_template(identity: str, request: Request):
         stage.mkdir()
         try:
             if item['type'] == 'verification':
-                prepare_clone(demo.templates, item, stage, dossier_id, 'before')
+                before = prepare_clone(demo.templates, item, stage, dossier_id, 'before')
+                after = root / ('.demo-test-after-' + uuid4().hex)
+                after.mkdir()
+                try:
+                    prepare_clone(demo.templates, item, after, dossier_id, 'after', before)
+                    for photo in before['photos']:
+                        destination = after / photo['path']
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(stage / photo['path'], destination)
+                    shutil.rmtree(stage)
+                    stage = after
+                finally:
+                    if after.exists() and after != stage:
+                        shutil.rmtree(after)
             else:
                 prepare_clone(demo.templates, item, stage, dossier_id)
             stage.rename(root / dossier_id)
