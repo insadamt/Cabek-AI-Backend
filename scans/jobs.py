@@ -103,7 +103,9 @@ class ScanManager:
                         raise DossierError(422, "no_valid_photos", "The dossier has no valid photos.")
                     for photo in dossier.photos.values():
                         validate_image(confined_path(dossier.directory, photo.original_path))
-                    self.backend.ensure_available(self.settings.models_dir)
+                    ensure_available = (getattr(self.backend, 'ensure_pricing_available', self.backend.ensure_available)
+                                        if dossier.metadata.mock_engine else self.backend.ensure_available)
+                    ensure_available(self.settings.models_dir)
                     reserved = self.capacity.acquire(blocking=False)
                     if not reserved:
                         raise DossierError(503, "worker_unavailable", "The scan queue is full.")

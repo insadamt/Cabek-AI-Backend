@@ -18,6 +18,9 @@ class CameraService:
     def source(self):
         if self.captures.settings.tunnel_mode == "disabled":
             return "disabled"
+        mock = getattr(self.captures, "mock_results", None)
+        if mock and mock.read()["enabled"]:
+            return "demo" if self.captures.settings.tunnel_mode == "mock" else "tiandy"
         store = self.captures.operation_settings
         demo = store.read()["demo_mode"] if store else self.captures.settings.tunnel_mode == "mock"
         return "demo" if demo else "tiandy"

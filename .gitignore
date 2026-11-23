@@ -37,3 +37,10 @@ data/dossiers/**/.econstat/
 
 # Dossiers contain installation data and generated inspection documents.
 /data/dossiers/
+
+# Local assistant configuration is private to each developer.
+.cursor/
+AGENTS.md
+CLAUDE.md
+.github/copilot-instructions.md
+.aider*

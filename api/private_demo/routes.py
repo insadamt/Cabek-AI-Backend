@@ -5,12 +5,14 @@ route checks authorization and every mutation requires a same-origin custom head
 """
 from io import BytesIO
 import json
-from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
-from fastapi.responses import StreamingResponse
+import re
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRoute
 from filelock import Timeout
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from api.errors import DossierError
+from api.private_demo.catalog import EditorCatalog, editor_catalog
 from api.private_demo.auth import COOKIE, password_record, save_secret
 from api.private_demo.bundles import export_zip
 from api.settings_routes import require_local_settings
@@ -93,6 +95,11 @@ def rotate(payload: Credentials, request: Request, response: Response):
 def mode(payload: ModeEdit, request: Request):
     service(request).state.operation_settings.update(demo_mode=payload.enabled)
     return {'enabled':payload.enabled}
+
+
+@router.get('/catalog', dependencies=[Depends(authenticated)], response_model=EditorCatalog)
+def catalog():
+    return editor_catalog()
 
 
 @router.get('/templates', dependencies=[Depends(authenticated)])
@@ -184,3 +191,64 @@ def test_template(identity: str, request: Request):
             if stage.exists():
                 shutil.rmtree(stage)
     return demo.state.dossier_service.read_result(dossier_id)
+
+
+@router.put('/templates/{identity}/editor', dependencies=[Depends(authenticated)])
+async def save_editor(identity: str, request: Request, document: str = Form(max_length=4 * 1024 * 1024), files: list[UploadFile] = File(default=[])):
+    from api.private_demo.editor_schemas import EditorSave
+    payload = EditorSave.model_validate_json(document)
+    uploads = {}
+    total = 0
+    for file in files:
+        content = await file.read(10 * 1024 * 1024 + 1)
+        total += len(content)
+        if len(content) > 10 * 1024 * 1024 or total > 128 * 1024 * 1024:
+            raise DossierError(413, 'upload_too_large', '10 Mio par fichier, 128 Mio par enregistrement.')
+        if not file.filename or file.filename in uploads:
+            raise DossierError(422, 'duplicate_upload', 'Identifiant de fichier absent ou en double.')
+        uploads[file.filename] = content
+    store = service(request).templates
+    store.commit(identity=identity, editor=payload.document, uploads=uploads, expected_version=payload.expected_version, vehicle_catalog=request.app.state.vehicle_catalog)
+    return store.inspect(identity)
+
+
+@router.get('/templates/{identity}/media/{path:path}', dependencies=[Depends(authenticated)])
+def editor_media(identity: str, path: str, request: Request, version: str = Query(min_length=1, max_length=120)):
+    from api.files import confined_path
+    from api.private_demo.bundles import allowed_path
+    from api.private_demo.editor_document import inspect_editor
+    store = service(request).templates
+    item = store.get(identity)
+    if not re.fullmatch(r'[a-f0-9]{32}', version):
+        raise DossierError(404, 'artifact_not_found', 'Fichier privé introuvable.')
+    revision = {**item, 'version': version}
+    allowed = inspect_editor(store, revision)['media']
+    if path not in allowed:
+        raise DossierError(404, 'artifact_not_found', 'Fichier privé introuvable.')
+    target = confined_path(store.directory(revision), str(allowed_path(path)))
+    return FileResponse(target, headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+
+class MockModeEdit(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    enabled: StrictBool
+    template_id: str | None = None
+
+
+@router.get('/mock-results', dependencies=[Depends(authenticated)])
+def mock_results(request: Request):
+    return service(request).mock_results.read()
+
+
+@router.put('/mock-results', dependencies=[Depends(authenticated)])
+def configure_mock_results(payload: MockModeEdit, request: Request):
+    return service(request).mock_results.configure(payload.enabled, payload.template_id)
+
+
+@router.post('/mock-template', dependencies=[Depends(authenticated)], status_code=201)
+def create_mock_template(request: Request):
+    from uuid import uuid4
+    return service(request).templates.commit(title='Résultat préparé', metadata={
+        'dossier_id': 'TEMPLATE-' + uuid4().hex, 'type': 'chiffrage_rapide',
+        'source': 'cabek_ai', 'matricule': '1-A-1', 'photos': [],
+    })

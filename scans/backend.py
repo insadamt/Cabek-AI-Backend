@@ -1,3 +1,8 @@
+"""Launch supervised inference or annotation-pricing workers with scoped dependencies.
+
+Depends on the existing worker process contract; prepared annotations require the
+pricing engine libraries but do not require YOLO models or Torch.
+"""
 import importlib.util
 import os
 from pathlib import Path
@@ -30,6 +35,11 @@ class ModelProcessBackend:
             raise DossierError(503, "worker_unavailable", "Install requirements-scan.txt before scanning.")
         if any(not (models_dir / name).is_file() for name in MODEL_FILENAMES):
             raise DossierError(503, "worker_unavailable", "Required model files are unavailable.")
+
+    def ensure_pricing_available(self, models_dir: Path) -> None:
+        dependencies = ('cv2', 'numpy', 'reportlab', 'requests')
+        if any(importlib.util.find_spec(name) is None for name in dependencies):
+            raise DossierError(503, 'worker_unavailable', 'Install the engine pricing dependencies.')
 
     def launch(self, request_path: Path, log: TextIO) -> subprocess.Popen:
 

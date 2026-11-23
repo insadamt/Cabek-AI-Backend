@@ -13,7 +13,12 @@ def prepare_capture_attempt(service, dossier, metadata, previous, phase, zoom_ch
         'slow_mode': False, 'demo_mode': service.settings.tunnel_mode == 'mock'}
     modern = (service.settings.tunnel_mode == 'tiandy' or zoom_channels is not None
               or not preferences['demo_mode'] or bool(previous and previous.get('capture_source')))
+    mock = getattr(service, 'mock_results', None)
+    if mock and mock.read()['enabled']:
+        modern = True
     source = ('demo' if preferences['demo_mode'] else 'tiandy') if modern else None
+    if mock and mock.read()['enabled']:
+        source = service.cameras.source()
     fresh = (dossier.metadata.type == 'forfait_expertise' or source == 'tiandy'
              or bool(previous and previous.get('capture_source') != source)
              or bool(modern and previous and zoom_channels is not None and

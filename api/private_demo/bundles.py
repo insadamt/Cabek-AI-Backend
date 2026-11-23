@@ -94,6 +94,15 @@ def validate_attachment_pdf(path):
 
 def validate_native(directory, complete=False):
     metadata = read_json_object(directory / 'metadata.json', 'invalid_metadata')
+    from api.private_demo.editor_schemas import AUTHORING_FILE, EditorDocument
+    authoring = directory / AUTHORING_FILE
+    if authoring.exists():
+        document = EditorDocument.model_validate(read_json_object(authoring, 'invalid_demo_editor'))
+        if complete:
+            from api.private_demo.editor_document import document_issues
+            issues = document_issues(document)
+            if issues:
+                raise DossierError(422, 'demo_incomplete', ' '.join(issues))
     if any(c.get('status') in ('capturing', 'queued', 'processing') for c in metadata.get('captures', {}).values()):
         raise DossierError(409, 'active_bundle', 'Arrêtez les captures avant l’import.')
     dossier_id = metadata.get('dossier_id', '')

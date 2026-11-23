@@ -1,7 +1,7 @@
 """Run the existing expertise pipeline for expertise and quick-estimation inputs.
 
-Depends on existing YOLO models, pricing, and report generation; registration
-dates map to the supported pricing year through scans.vehicle.
+Depends on YOLO detection or frozen prepared annotations, then shared pricing
+and report generation. Both paths use the dossier vehicle and registration year.
 """
 
 from pathlib import Path
@@ -40,26 +40,29 @@ def analyze_dossier(request: ScanRequest) -> ScanSummary:
     request.output_dir.mkdir(parents=True, exist_ok=True)
     if (request.output_dir / "result.json").exists():
         raise FileExistsError("The output directory already has a final result.")
-    models = load_models(request.models_dir)
-    instances = []
-    for photo in request.photos:
-        with Image.open(request.dossier_dir / photo.original_path) as image:
-            pixels = np.array(image.convert("RGB"))
-        result = analyser(
-            models[0], models[1], pixels,
-            conf_pieces=0.50, conf_dommages=0.50, iou_min=0.05,
-            marque=request.metadata.get("marque", ""),
-            nom_image=Path(photo.original_path).name,
-            modele_zone_critique=models[2], conf_zone_critique=0.25,
-            seuil_zone_critique=0.05,
-        )
-        for path, key in zip(annotation_paths(request.output_dir, photo),
-                             ("img_pieces", "img_dommages", "img_zones_critiques")):
-            if result[key] is None:
-                raise ValueError("A required annotation was not generated.")
-            publish_annotation(path, result[key])
-        instances.extend(result["instances"])
-
+    if request.metadata.get('mock_engine'):
+        from scans.prepared import load_prepared_instances
+        instances = load_prepared_instances(request)
+    else:
+        models = load_models(request.models_dir)
+        instances = []
+        for photo in request.photos:
+            with Image.open(request.dossier_dir / photo.original_path) as image:
+                pixels = np.array(image.convert("RGB"))
+            result = analyser(
+                models[0], models[1], pixels,
+                conf_pieces=0.50, conf_dommages=0.50, iou_min=0.05,
+                marque=request.metadata.get("marque", ""),
+                nom_image=Path(photo.original_path).name,
+                modele_zone_critique=models[2], conf_zone_critique=0.25,
+                seuil_zone_critique=0.05,
+            )
+            for path, key in zip(annotation_paths(request.output_dir, photo),
+                                 ("img_pieces", "img_dommages", "img_zones_critiques")):
+                if result[key] is None:
+                    raise ValueError("A required annotation was not generated.")
+                publish_annotation(path, result[key])
+            instances.extend(result["instances"])
     # Keep the existing order so saved feedback still matches deterministic detection IDs.
 
     instances = dedupliquer_instances(instances)

@@ -304,7 +304,7 @@ class CaptureService:
     @serialize_dossier
     def start_analysis(self, dossier_id, key, *, retry_failed=False):
         dossier = self.workflows.repository.read_dossier(dossier_id)
-        if dossier.metadata.type == "verification" or dossier.metadata.demo:
+        if dossier.metadata.type == "verification" or (dossier.metadata.demo and not dossier.metadata.mock_engine):
             return
         _, state = self.workflows.repository.read_analysis_state(dossier)
         if state != "not_analyzed" and not (

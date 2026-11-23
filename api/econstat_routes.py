@@ -39,7 +39,7 @@ def describe_econstat(dossier_id: DossierId, request: Request):
 @router.post('/{dossier_id}/econstat/analysis', response_model=EconstatPreparation)
 def analyze_econstat(dossier_id: DossierId, request: Request, response: Response):
     demo = request.app.state.private_demo
-    if demo.managed() and demo.enabled() and not demo.repository.read_dossier(dossier_id).metadata.demo:
+    if demo.managed() and demo.enabled() and not demo.mock_results.read()["enabled"] and not demo.repository.read_dossier(dossier_id).metadata.demo:
         result = request.app.state.econstat_service.describe(dossier_id, request.scope.get('root_path', ''))
         result.update(status='manual_required', message='Les recommandations préparées seront chargées avec le modèle ; aucun OCR réel lancé.')
     else:

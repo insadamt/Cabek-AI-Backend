@@ -19,7 +19,9 @@ class UploadLimitMiddleware:
         if scope["type"] != "http" or not headers.get(b"content-type", b"").lower().startswith(b"multipart/form-data"):
             await self.app(scope, receive, send)
             return
-        limit = 129 * 1024 * 1024 if scope.get('path') == '/api/private-demo/import' else MAX_MULTIPART_BYTES
+        path = scope.get('path', '')
+        private_bundle = path == '/api/private-demo/import' or (path.startswith('/api/private-demo/templates/') and path.endswith('/editor'))
+        limit = 129 * 1024 * 1024 if private_bundle else MAX_MULTIPART_BYTES
         content = bytearray()
         while True:
             message = await receive()

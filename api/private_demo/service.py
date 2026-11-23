@@ -22,6 +22,8 @@ class PrivateDemoService:
         self.state = application.state
         self.root = Path(os.environ.get('CABEK_DEMO_DIR', settings.runtime_root / 'private-demo'))
         self.templates = TemplateStore(self.root)
+        from api.private_demo.mock_results import MockResults
+        self.mock_results = MockResults(self)
         secret = os.environ.get('CABEK_DEMO_SECRET_FILE', self.root / 'secret.json')
         self.auth = AdministrationAuth(self.root / 'authentication', secret)
         self.repository = self.state.workflow_service.repository
@@ -35,6 +37,8 @@ class PrivateDemoService:
         return self.state.operation_settings.read()['demo_mode']
 
     def capture(self, dossier_id, phase, request_key=None):
+        if self.mock_results.read()["enabled"]:
+            return None
         dossier = self.repository.read_dossier(dossier_id)
         if not self.managed() and not dossier.metadata.demo:
             return None
@@ -104,7 +108,12 @@ class PrivateDemoService:
                     shutil.rmtree(stage)
 
     def guard_scan(self, dossier_id):
+        prepared = self.mock_results.apply(dossier_id)
+        if prepared is not None:
+            return prepared
         dossier = self.repository.read_dossier(dossier_id)
+        if dossier.metadata.mock_engine:
+            return None
         if dossier.metadata.demo:
             if dossier.metadata.type == 'verification':
                 raise DossierError(409, 'scan_disabled_for_type', 'Aucune analyse IA pour une vérification.')

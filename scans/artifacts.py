@@ -59,6 +59,9 @@ def input_signatures(dossier: DossierRecord) -> dict[str, str]:
     paths = ["metadata.json", *(photo.original_path for photo in dossier.photos.values())]
     if confined_path(dossier.directory, "feedback.json").is_file():
         paths.append("feedback.json")
+    if dossier.metadata.mock_engine:
+        evidence = confined_path(dossier.directory, '.mock-evidence')
+        paths.extend(p.relative_to(dossier.directory).as_posix() for p in sorted(evidence.rglob('*')) if p.is_file())
     signatures = {}
     for relative_path in paths:
         path = confined_path(dossier.directory, relative_path)

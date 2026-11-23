@@ -23,7 +23,7 @@ def cameras(request: Request, phase: PhotoPhase | None = None):
     service = request.app.state.capture_service.cameras
     result = service.catalog(phase, request.scope.get('root_path', ''))
     demo = request.app.state.private_demo
-    if demo.managed() and demo.enabled():
+    if demo.managed() and demo.enabled() and not demo.mock_results.read()["enabled"]:
         result['prepared_demo'] = True
     return result
 

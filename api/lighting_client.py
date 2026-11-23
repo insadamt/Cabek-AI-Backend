@@ -52,6 +52,8 @@ class LightingClient:
         self.command_lock = Lock()
         self.last_acknowledged_at = None
         self.last_command_error = None
+        self.last_warning_at = float('-inf')
+        self.last_warning_reason = None
         self.manual_override = False
         self.sent_revision = -1
         self.capture_id = None
@@ -211,8 +213,13 @@ class LightingClient:
                         self.send(path, payload)
                         self.sent_revision = revision
                     except Exception as error:
-                        self.last_command_error = type(error).__name__
-                        logger.warning('Lighting API unavailable: %s', type(error).__name__)
+                        reason = lighting_failure_reason(error)
+                        self.last_command_error = reason
+                        # Keep disconnected hardware visible without flooding station logs.
+
+                        if reason != self.last_warning_reason or self.clock() - self.last_warning_at >= 30:
+                            logger.warning('Lighting command failed: %s', reason)
+                            self.last_warning_at, self.last_warning_reason = self.clock(), reason
             with self.lock:
                 # Recheck after slow HTTP so shutdown arriving during a request still sends OFF.
 
@@ -235,3 +242,15 @@ class LightingClient:
             self.stopping = True
             self.wake.set()
         self.worker.join(timeout=self.settings.timeout * 2 + 1)
+
+
+def lighting_failure_reason(error):
+    if isinstance(error, HTTPError):
+        if error.code == 503:
+            return 'ESP32 unavailable; lighting HTTP service responded (HTTP 503)'
+        if error.code == 501:
+            return 'ESP32 firmware does not support the requested effect (HTTP 501)'
+        return f'Lighting HTTP API rejected the command (HTTP {error.code})'
+    if isinstance(error, OSError):
+        return 'Lighting HTTP service could not be reached'
+    return 'Lighting HTTP service returned an invalid response'

@@ -14,6 +14,7 @@ from api.files import read_json_object
 from api.workflow_schemas import normalize_plate
 from scans.artifacts import publish_json, publish_bytes
 from api.private_demo.bundles import allowed_path, validate_native, extract_zip, export_zip
+from api.private_demo.editor_document import inspect_editor
 
 
 class TemplateStore:
@@ -54,12 +55,14 @@ class TemplateStore:
         validate_native(self.directory(matches[0]), complete=True)
         return matches[0]
 
-    def commit(self, metadata=None, identity=None, asset=None, archive=None, active=None, title=None):
+    def commit(self, metadata=None, identity=None, asset=None, archive=None, active=None, title=None, editor=None, uploads=None, expected_version=None, vehicle_catalog=None):
         with self.locked():
             registry = self.registry()
             previous = registry['templates'].get(identity) if identity else None
             if identity and not previous:
                 raise DossierError(404, 'demo_template_not_found', 'Modèle introuvable.')
+            if expected_version is not None and (not previous or previous['version'] != expected_version):
+                raise DossierError(409, 'demo_version_conflict', 'Une version plus récente existe. Exportez vos changements ou rechargez le modèle.')
             identity = identity or uuid4().hex
             version = uuid4().hex
             target = self.root / 'templates' / identity / version
@@ -79,9 +82,21 @@ class TemplateStore:
                     if path.parts[0] not in ('photos', 'analysis', 'documents', '.econstat'):
                         raise DossierError(422, 'invalid_asset', 'Emplacement non autorisé.')
                     publish_bytes(stage / path, content)
+                if editor is not None:
+                    from api.private_demo.editor_save import write_editor_revision
+                    write_editor_revision(stage, editor, uploads or {}, vehicle_catalog)
+                    title = editor.title
+                    active = False
                 saved = read_json_object(stage / 'metadata.json', 'invalid_metadata')
                 category = saved.get('type', 'forfait_expertise')
                 matricule = normalize_plate(saved.get('matricule', ''))
+                from api.private_demo.editor_schemas import AUTHORING_FILE, EditorDocument
+                authoring_path = stage / AUTHORING_FILE
+                authoring = EditorDocument.model_validate(read_json_object(authoring_path, 'invalid_demo_editor')) if authoring_path.exists() else None
+                resolved_title = (title or (previous or {}).get('title') or (authoring.title if authoring else matricule))[:120]
+                if authoring:
+                    authoring.title = resolved_title
+                    publish_json(authoring_path, authoring.model_dump())
                 enabled = active if active is not None else previous['active'] if previous else False
                 result_path = stage / 'analysis/result.json'
                 report_path = stage / 'analysis/report.pdf'
@@ -93,7 +108,7 @@ class TemplateStore:
                 validate_native(stage, complete=enabled)
                 if enabled and any(item['id'] != identity and item['active'] and item['type'] == category and item['matricule'] == matricule for item in registry['templates'].values()):
                     raise DossierError(409, 'demo_mapping_conflict', 'Une correspondance active existe déjà.')
-                item = {'id': identity, 'version': version, 'title': (title or (previous or {}).get('title') or matricule)[:120],
+                item = {'id': identity, 'version': version, 'title': resolved_title,
                         'type': category, 'matricule': matricule, 'active': enabled}
                 target.parent.mkdir(parents=True, exist_ok=True)
                 stage.rename(target)
@@ -122,4 +137,5 @@ class TemplateStore:
         item = self.get(identity)
         directory = self.directory(item)
         return {**item, 'metadata': read_json_object(directory / 'metadata.json', 'invalid_metadata'),
+                **inspect_editor(self, item),
                 'artifacts': sorted(p.relative_to(directory).as_posix() for p in directory.rglob('*') if p.is_file())}

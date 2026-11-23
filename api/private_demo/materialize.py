@@ -29,7 +29,14 @@ def rewrite(value, replacements, field=None):
 def prepare_clone(templates, item, destination, dossier_id, phase=None, existing=None):
     source = templates.directory(item)
     validate_native(source, complete=True)
+    from api.private_demo.editor_schemas import AUTHORING_FILE, EditorDocument
+    authoring_path = source / AUTHORING_FILE
+    authoring = read_json_object(authoring_path, 'invalid_demo_editor') if authoring_path.exists() else None
     copy_native(source, destination)
+    # Authoring geometry and imported base layers belong only to private templates.
+
+    (destination / '.demo-editor.json').unlink(missing_ok=True)
+    shutil.rmtree(destination / '.editor-assets', ignore_errors=True)
     metadata = read_json_object(destination / 'metadata.json', 'invalid_metadata')
     old_id = metadata['dossier_id']
     replacements = [(old_id, dossier_id)]
@@ -76,6 +83,12 @@ def prepare_clone(templates, item, destination, dossier_id, phase=None, existing
     publish_json(destination / 'metadata.json', metadata)
     if not phase:
         publish_json(destination / 'analysis/status.json', {'status':'completed', 'demo':True})
+        if authoring:
+            from api.private_demo.editor_render import render_manual_report
+            document = EditorDocument.model_validate(rewrite(authoring, replacements))
+            document.metadata = metadata
+            result = read_json_object(destination / 'analysis/result.json', 'invalid_result')
+            (destination / 'analysis/report.pdf').write_bytes(render_manual_report(document, result))
     report = destination / 'analysis/report.pdf'
     if report.is_file():
         import pymupdf
